@@ -1,6 +1,12 @@
 # PowerPinger Quick Start Guide
 
+## 📚 Navigation
+[🏠 Main README](README.md) | [🔧 Enhanced Features](ENHANCED_FEATURES.md) | [📋 Changelog](CHANGELOG.md) | [🤝 Contributing](CONTRIBUTING.md)
+
+## 🌍 Languages
 [کوردی](QUICKSTART_KU.md) | [فارسی](QUICKSTART_FA.md) | [**English**](QUICKSTART.md)
+
+---
 
 ## 🚀 5-Minute Setup
 
@@ -75,6 +81,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - Reduce timeout values
 - Enable jump mode: `-Jump 5 -MaxFailures 3`
 - Use port-only mode for faster results
+- Limit responses per range: `-MaxResponses 5`
 
 ## 📊 Understanding Results
 
@@ -91,5 +98,17 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - **Network Analysis**: Detect filtering patterns  
 - **Security Assessment**: Check service availability
 - **Troubleshooting**: Diagnose network issues
+
+## ⚠️ Important Warning
+
+**Before using PowerPinger:**
+- ✅ **Only scan networks you own or have written permission to test**
+- ❌ **Do not scan third-party networks without explicit authorization**
+- 📋 **Check your organization's IT policies before use**
+- ⚖️ **Ensure compliance with local laws and regulations**
+- 🛡️ **This tool may contain bugs - use at your own risk**
+- 📊 **Results may not always be accurate - verify with other tools**
+
+**By using this tool, you accept full responsibility for compliance and results.**
 
 Need more help? Check the full [README.md](README.md) or [open an issue](https://github.com/yourusername/PowerPinger/issues)!

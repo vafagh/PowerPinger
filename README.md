@@ -1,6 +1,16 @@
 # 🎯 PowerPinger - Advanced Network Filtering Detection Tool
 
+## 🌍 Languages
 [کوردی](README_KU.md) | [فارسی](README_FA.md) | [**English**](README.md)
+
+## 📚 Documentation Navigation
+- 📖 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
+- 🚀 [Enhanced Features](ENHANCED_FEATURES.md) - Advanced capabilities overview
+- 📋 [Changelog](CHANGELOG.md) - Version history and updates
+- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
+- 🎯 [MaxResponses Feature](MAXRESPONSES_FEATURE.md) - Response limiting documentation
+
+---
 
 A lightweight, standalone PowerShell-based network scanner designed to detect network filtering patterns through intelligent ping and port scanning. **Runs natively on Windows 10+ without any additional software installation or dependencies** - perfect for deployment in restricted networks where software installations are limited.
 
@@ -29,6 +39,7 @@ A lightweight, standalone PowerShell-based network scanner designed to detect ne
 - **Zero Dependencies**: Runs on Windows 10+ built-in PowerShell (no installations required)
 - **Ultra Portable**: ~1000 lines of code + IP list = complete network analysis toolkit
 - **Jump Mode**: Skip unresponsive IP blocks intelligently
+- **Response Limiting**: Stop scanning after finding sufficient responsive IPs per range
 - **Range Processing**: Handle CIDR notation (e.g., 192.168.1.0/24)
 - **Multiple Formats**: Support CSV, TXT input files
 - **Real-time Feedback**: Live scanning progress with color coding
@@ -129,6 +140,16 @@ Skip dead IP blocks automatically:
 .\powerPinger.ps1 -InputFile "large_range.csv" -Jump 10 -MaxFailures 3 -Skip 5
 ```
 
+### **5. Limit Responses per Range**
+Stop scanning after finding enough responsive IPs to save time:
+```powershell
+# Stop after finding 5 responsive IPs per range
+.\powerPinger.ps1 -InputFile "dense_networks.csv" -MaxResponses 5
+
+# Quick network discovery (3 responses per range)
+.\powerPinger.ps1 -InputFile "ranges.csv" -MaxResponses 3 -ScanMode "smart"
+```
+
 ## 📊 Input File Format
 
 ### **CSV Format (Recommended)**
@@ -164,9 +185,10 @@ IP,Location,Region,City,PostalCode
 | `-Timeout` | Ping timeout (ms) | `1500` | `3000`, `5000` |
 | `-PortTimeout` | Port connection timeout (ms) | `3000` | `5000`, `1000` |
 | `-Ports` | Ports to scan | `80,443,22,53,8080,8443` | `80,443,22` |
-| `-MaxFailures` | Failures before action | `5` | `3`, `10` |
-| `-Jump` | IPs to skip after failures | `3` | `5`, `10`, `0` (disabled) |
-| `-Skip` | Jumps before skipping range | `5` | `3`, `10` |
+| `-MaxFailures` | Failures before action | `4` | `3`, `10` |
+| `-Jump` | IPs to skip after failures | `16` | `5`, `10`, `0` (disabled) |
+| `-Skip` | Jumps before skipping range | `3` | `3`, `10` |
+| `-MaxResponses` | Max responses per range | `10` | `5`, `20`, `0` (disabled) |
 
 ## 📈 Output Formats
 
@@ -299,15 +321,43 @@ Contributions are welcome! Please feel free to:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## ⚠️ Disclaimer
+## ⚠️ Important Disclaimers and Warnings
 
-This tool is intended for:
-- **Educational purposes**
-- **Legitimate network testing**
-- **Research into network connectivity**
-- **Network troubleshooting and analysis**
+### **⚖️ Legal and Compliance Warning**
+- **Use Only on Authorized Networks**: Only use this tool on networks you own or have explicit written permission to test
+- **Compliance with Local Laws**: Using network scanning tools may violate local laws, regulations, or organizational policies
+- **Terms of Service**: Scanning third-party networks may violate their terms of service or acceptable use policies
+- **Corporate Policies**: Check your organization's IT policies before use - network scanning may be prohibited
+- **International Restrictions**: Network scanning tools may be restricted or illegal in some jurisdictions
+- **Your Responsibility**: You are solely responsible for ensuring compliance with all applicable laws and regulations
 
-**Please use responsibly and in compliance with local laws and regulations.**
+### **🛠️ Technical Limitations and Risks**
+- **Not Thoroughly Tested**: This tool has not been tested under all possible network conditions and configurations
+- **Potential Malfunctions**: The software may contain bugs, errors, or unexpected behaviors that could affect results
+- **Network Impact**: Scanning activities may impact network performance or trigger security alerts
+- **False Results**: Ping and connectivity results may not accurately reflect actual network conditions
+- **Incomplete Coverage**: The tool may not detect all types of network filtering or connectivity issues
+- **Environmental Variables**: Results may vary based on network topology, load, and configuration changes
+
+### **🚫 No Warranties or Guarantees**
+- **"AS IS" Basis**: This software is provided "as is" without any warranties of any kind
+- **No Liability**: The author(s) accept no responsibility for any damages, losses, or consequences resulting from use
+- **Result Accuracy**: No guarantee is made regarding the accuracy, completeness, or reliability of results
+- **Fitness for Purpose**: No warranty that the tool will meet your specific requirements or expectations
+- **Continuous Operation**: No guarantee of uninterrupted or error-free operation
+
+### **⚠️ Use at Your Own Risk**
+- **Personal Responsibility**: You assume all risks associated with using this tool
+- **Backup and Safety**: Always test in controlled environments before production use
+- **Professional Advice**: Consult with network security professionals for critical assessments
+- **Alternative Tools**: Consider using established, professionally supported tools for critical operations
+
+### **🔒 Security and Privacy**
+- **Data Sensitivity**: Be aware that network scanning may reveal sensitive information
+- **Log Security**: Protect and secure any logs or results generated by the tool
+- **Network Exposure**: Scanning activities may be logged by target systems or security tools
+
+**By using PowerPinger, you acknowledge that you have read, understood, and agree to these terms and disclaimers.**
 
 ## 🔗 Related Projects
 
@@ -330,3 +380,12 @@ This tool is intended for:
 ---
 
 **⭐ If this project helps you understand or analyze network filtering patterns, please consider starring the repository!**
+
+## 📚 More Information
+- 📖 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
+- 🚀 [Enhanced Features](ENHANCED_FEATURES.md) - Advanced capabilities overview
+- 📋 [Changelog](CHANGELOG.md) - Version history and updates
+- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
+- 🎯 [MaxResponses Feature](MAXRESPONSES_FEATURE.md) - Response limiting documentation
+
+[⬆️ Back to top](#-powerpinger---advanced-network-filtering-detection-tool)

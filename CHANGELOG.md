@@ -1,6 +1,35 @@
 # Changelog
 
+## 📚 Navigation
+[🏠 Main README](README.md) | [🚀 Quick Start](QUICKSTART.md) | [🔧 Enhanced Features](ENHANCED_FEATURES.md) | [🤝 Contributing](CONTRIBUTING.md)
+
+**Languages**: [کوردی](README_KU.md) | [فارسی](README_FA.md) | [English](README.md)
+
+---
+
 All notable changes to PowerPinger will be documented in this file.
+
+## [2.1.0] - 2025-06-22
+
+### Added
+- **MaxResponses Parameter**: New `-MaxResponses` parameter to limit successful responses per range
+  - Default value: 10 responses per range
+  - Set to 0 to disable (scan all IPs in range)
+  - Helps optimize scanning time for dense networks
+  - Available in both interactive and command-line modes
+  - Integrated with all scan modes (ping/port/both/smart)
+
+### Fixed
+- **Range Exit Logic**: Fixed issue where MaxResponses feature wasn't properly stopping range scans
+  - Added proper flag-based exit mechanism for outer scanning loop
+  - Now correctly stops after reaching the specified number of successful responses
+  - Maintains accurate result counts and proper CSV output
+
+### Enhanced
+- **Interactive Configuration**: Added MaxResponses option to interactive setup menu
+- **Progress Display**: Shows "Response limit enabled" message during scanning
+- **Usage Examples**: Updated documentation with MaxResponses examples
+- **Parameter Documentation**: Added comprehensive parameter descriptions
 
 ## [2.0.0] - 2025-06-22
 

@@ -1,5 +1,12 @@
 # PowerPinger v2.0 - Enhanced Features Summary
 
+## 📚 Navigation
+[🏠 Main README](README.md) | [🚀 Quick Start](QUICKSTART.md) | [📋 Changelog](CHANGELOG.md) | [🤝 Contributing](CONTRIBUTING.md)
+
+**Languages**: [کوردی](README_KU.md) | [فارسی](README_FA.md) | [English](README.md)
+
+---
+
 ## 🎯 Enhanced Interactive Mode
 The PowerPinger script now features a comprehensive interactive mode with guided configuration and user-friendly interface.
 
@@ -43,6 +50,16 @@ The PowerPinger script now features a comprehensive interactive mode with guided
 - **Parameter Documentation**: Built-in help with examples and usage patterns
 - **Configuration Summary**: Review all settings before starting scan
 - **Final Confirmation**: User approval required before starting scan in interactive mode
+
+#### 7. **MaxResponses Parameter** (v2.1.0)
+- **Response Limiting**: Stop scanning a range after finding a specified number of responsive IPs
+- **Default Value**: 10 successful responses per range
+- **Flexible Configuration**: Set to 0 to disable (scan all IPs in range)
+- **Performance Optimization**: Significantly reduces scanning time for dense networks
+- **Mode Integration**: Works with all scan modes (ping, port, both, smart)
+- **Interactive Support**: Available in interactive configuration menu
+- **Smart Exit Logic**: Proper flag-based mechanism to exit range scanning loops
+- **Progress Feedback**: Shows "Response limit enabled" and "Reached maximum responses" messages
 
 ### 🔧 Technical Improvements
 

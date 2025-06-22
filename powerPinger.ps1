@@ -1,5 +1,39 @@
 ﻿#Requires -Version 5.0
 
+<#
+.SYNOPSIS
+    PowerPinger - Advanced Network Filtering Detection Tool
+
+.DESCRIPTION
+    A PowerShell-based network scanner for detecting network filtering patterns
+    through intelligent ping and port scanning analysis.
+
+.NOTES
+    ⚠️  IMPORTANT DISCLAIMERS:
+    
+    LEGAL COMPLIANCE:
+    - Only use on networks you own or have explicit written permission to test
+    - Using network scanning tools may violate local laws, regulations, or policies
+    - You are solely responsible for ensuring compliance with all applicable laws
+    
+    TECHNICAL LIMITATIONS:
+    - This tool has not been thoroughly tested under all network conditions
+    - Software may contain bugs, errors, or unexpected behaviors
+    - Results may not accurately reflect actual network conditions
+    - No guarantee of accuracy, completeness, or reliability of results
+    
+    NO WARRANTIES:
+    - Software provided "AS IS" without warranties of any kind
+    - Author accepts no responsibility for damages, losses, or consequences
+    - Use at your own risk and discretion
+    
+    By using this script, you acknowledge that you have read, understood, 
+    and agree to these terms and disclaimers.
+
+.EXAMPLE
+    .\powerPinger.ps1 -InputFile "targets.csv" -ScanMode "smart"
+#>
+
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -12,22 +46,24 @@ param (
     [int]$Timeout = 1500, # Ping timeout in milliseconds (default: 500ms)
     
     [Parameter()]
-    [int]$MaxFailures = 5, # Number of consecutive failures before action (skip or jump)
+    [int]$MaxFailures = 4, # Number of consecutive failures before action (skip or jump)
     
     [Parameter()]
-    [int]$Jump = 3,  # Number of IPs to skip after MaxFailures (0 = disabled)
+    [int]$Jump = 16,  # Number of IPs to skip after MaxFailures (0 = disabled)
     
     [Parameter()]
-    [int]$Skip = 5, # Number of jumps before skipping entire range (only applies if Jump > 0)
-    
-    [Parameter()]
+    [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)
+      [Parameter()]
     [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both", "smart"
     
     [Parameter()]
     [string]$Ports = "80,443,22,53,8080,8443", # Comma-separated list of ports to scan
     
     [Parameter()]
-    [int]$PortTimeout = 3000 # Port connection timeout in milliseconds
+    [int]$PortTimeout = 3000, # Port connection timeout in milliseconds
+    
+    [Parameter()]
+    [int]$MaxResponses = 10 # Maximum successful responses before skipping range (0 = disabled)
 )
 
 # =====================================
@@ -43,16 +79,17 @@ $DefaultOutputFile = "ping_results.csv"         # Default output CSV file name
 
 # Ping Settings
 $DefaultTimeout = 1500                          # Ping timeout in milliseconds (1000ms = 1 second)
-$DefaultMaxFailures = 5                         # Number of consecutive failures before action (skip or jump)
+$DefaultMaxFailures = 4                         # Number of consecutive failures before action (skip or jump)
 
 # Jump/Skip Settings
-$DefaultJump = 3                                # Number of IPs to skip after MaxFailures (0 = disabled, jump feature off)
-$DefaultSkip = 5                                # Number of jumps before skipping entire range (only applies if Jump > 0)
+$DefaultJump = 16                               # Number of IPs to skip after MaxFailures (0 = disabled, jump feature off)
+$DefaultSkip = 3                                # Number of jumps before skipping entire range (only applies if Jump > 0)
 
 # Port Scanning Settings (NEW!)
 $DefaultScanMode = "ping"                       # Default scan mode: "ping", "port", "both", "smart"
 $DefaultPorts = "80,443,22,53,8080,8443"        # Default ports to scan (HTTP, HTTPS, SSH, DNS, Alt-HTTP, Alt-HTTPS)
 $DefaultPortTimeout = 3000                      # Port connection timeout in milliseconds (3 seconds)
+$DefaultMaxResponses = 10                       # Maximum successful responses before skipping range (0 = disabled)
 
 # Usage Examples:
 # .\powerPinger.ps1                             # Uses interactive mode to select files
@@ -61,6 +98,7 @@ $DefaultPortTimeout = 3000                      # Port connection timeout in mil
 # .\powerPinger.ps1 -Jump 0                     # Disables jumping, interactive file selection
 # .\powerPinger.ps1 -ScanMode smart             # Smart filtering detection mode
 # .\powerPinger.ps1 -ScanMode port -Ports "80,443,22"  # Port-only scanning
+# .\powerPinger.ps1 -MaxResponses 5             # Stop after 5 responses per range
 # .\powerPinger.ps1 -InputFile "do.csv" -OutputFile "results.csv"  # Full command line mode
 
 # Override with default values if not specified via parameters
@@ -73,6 +111,7 @@ if (-not $PSBoundParameters.ContainsKey('Skip')) { $Skip = $DefaultSkip }
 if (-not $PSBoundParameters.ContainsKey('ScanMode')) { $ScanMode = $DefaultScanMode }
 if (-not $PSBoundParameters.ContainsKey('Ports')) { $Ports = $DefaultPorts }
 if (-not $PSBoundParameters.ContainsKey('PortTimeout')) { $PortTimeout = $DefaultPortTimeout }
+if (-not $PSBoundParameters.ContainsKey('MaxResponses')) { $MaxResponses = $DefaultMaxResponses }
 
 # =====================================
 
@@ -86,31 +125,104 @@ $isRunWithPowerShell = $MyInvocation.MyCommand.CommandType -eq 'ExternalScript' 
 # WELCOME SCREEN & PROGRAM INFO
 # =====================================
 
+# Function to detect if console supports Unicode/emojis properly
+function Test-UnicodeSupport {
+    # Check if we're in Windows Terminal, VS Code, or similar modern terminal
+    $modernTerminal = $false
+    
+    # Check environment variables that indicate modern terminals
+    if ($env:WT_SESSION -or $env:TERM_PROGRAM -eq "vscode" -or $env:ConEmuPID) {
+        $modernTerminal = $true
+    }
+    
+    # Check console font (modern terminals usually have better Unicode support)
+    try {
+        $host_ui = $Host.UI.RawUI
+        if ($host_ui.WindowTitle -match "Windows Terminal|Visual Studio Code") {
+            $modernTerminal = $true
+        }
+    }
+    catch {
+        # Ignore errors in font detection
+    }
+    
+    return $modernTerminal
+}
+
+# Function to get appropriate icon/symbol for display
+function Get-DisplayIcon {
+    param([string]$IconType)
+    
+    $supportsUnicode = Test-UnicodeSupport
+    
+    if ($supportsUnicode) {
+        # Modern terminal - use emojis and Unicode
+        switch ($IconType) {
+            "search" { return "🔍" }
+            "target" { return "🎯" }
+            "rocket" { return "🚀" }
+            "gear" { return "⚙️" }
+            "folder" { return "📂" }
+            "disk" { return "💾" }
+            "chart" { return "📊" }
+            "bulb" { return "💡" }
+            "check" { return "✅" }
+            "cross" { return "❌" }
+            "warning" { return "⚠️" }
+            "shield" { return "🛡️" }
+            "lightning" { return "⚡" }
+            "package" { return "📦" }
+            default { return "•" }
+        }
+    } else {
+        # Legacy PowerShell console - use simple ASCII
+        switch ($IconType) {
+            "search" { return "[SCAN]" }
+            "target" { return "[TARGET]" }
+            "rocket" { return "[START]" }
+            "gear" { return "[CONFIG]" }
+            "folder" { return "[INPUT]" }
+            "disk" { return "[OUTPUT]" }
+            "chart" { return "[RESULTS]" }
+            "bulb" { return "[TIP]" }
+            "check" { return "[OK]" }
+            "cross" { return "[ERROR]" }
+            "warning" { return "[WARN]" }
+            "shield" { return "[FILTER]" }
+            "lightning" { return "[FAST]" }
+            "package" { return "[PORTABLE]" }
+            default { return "*" }
+        }
+    }
+}
+
 function Show-WelcomeScreen {
     param (
         [bool]$IsInteractiveMode
     )
-    
-    Clear-Host
+      Clear-Host
+    $searchIcon = Get-DisplayIcon "search"
     Write-Host "╔══════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║                            🔍 PowerPinger v2.0                              ║" -ForegroundColor Cyan
+    Write-Host "║                            $searchIcon PowerPinger v2.0                              ║" -ForegroundColor Cyan
     Write-Host "║                      Advanced Network Range Scanner                         ║" -ForegroundColor Cyan
     Write-Host "╚══════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""    Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)" -ForegroundColor Green
     Write-Host "Current Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
-    
-    # Provide guidance for "Run with PowerShell" users
+      # Provide guidance for "Run with PowerShell" users
     if ($isRunWithPowerShell) {
-        Write-Host "💡 Tip: For best experience, run from PowerShell terminal" -ForegroundColor Yellow
+        $bulbIcon = Get-DisplayIcon "bulb"
+        Write-Host "$bulbIcon Tip: For best experience, run from PowerShell terminal" -ForegroundColor Yellow
         Write-Host "   Right-click in folder → Open PowerShell window here → .\powerPinger.ps1" -ForegroundColor Gray
     }
     Write-Host ""
     
     if ($IsInteractiveMode) {
-        Write-Host "🎯 Running in INTERACTIVE MODE" -ForegroundColor Magenta
+        $targetIcon = Get-DisplayIcon "target"
+        Write-Host "$targetIcon Running in INTERACTIVE MODE" -ForegroundColor Magenta
         Write-Host "   You will be guided through configuration options" -ForegroundColor Gray
     } else {
-        Write-Host "⚡ Running in COMMAND-LINE MODE" -ForegroundColor Yellow
+        $lightningIcon = Get-DisplayIcon "lightning"
+        Write-Host "$lightningIcon Running in COMMAND-LINE MODE" -ForegroundColor Yellow
         Write-Host "   Using provided parameters, skipping interactive questions" -ForegroundColor Gray
     }
     Write-Host ""
@@ -360,8 +472,7 @@ function Get-ScanConfiguration {
     Write-Host ""
     Write-Host "❓ Would you like to customize scanning parameters?" -ForegroundColor Yellow
     Write-Host "💡 Current defaults work well for most scenarios" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "📊 Current Settings:" -ForegroundColor Cyan
+    Write-Host ""    Write-Host "📊 Current Settings:" -ForegroundColor Cyan
     Write-Host "   • Scan Mode: $DefaultScanMode (ping/port/both/smart)" -ForegroundColor White
     Write-Host "   • Timeout: ${DefaultTimeout}ms per ping" -ForegroundColor White
     Write-Host "   • Port Timeout: ${DefaultPortTimeout}ms per port" -ForegroundColor White
@@ -369,18 +480,18 @@ function Get-ScanConfiguration {
     Write-Host "   • Max Failures: $DefaultMaxFailures consecutive timeouts before action" -ForegroundColor White
     Write-Host "   • Jump Mode: $(if ($DefaultJump -gt 0) { "$DefaultJump IPs (enabled)" } else { "Disabled" })" -ForegroundColor White
     Write-Host "   • Skip Limit: $DefaultSkip jumps before skipping entire range" -ForegroundColor White
+    Write-Host "   • Max Responses: $(if ($DefaultMaxResponses -gt 0) { "$DefaultMaxResponses per range (enabled)" } else { "Disabled" })" -ForegroundColor White
     Write-Host ""
     
     $customize = Read-Host "👉 Customize settings? (y/N)"
-    
-    if ($customize -match '^[Yy]') {
+      if ($customize -match '^[Yy]') {
         Write-Host ""
         Write-Host "🔧 Advanced Configuration" -ForegroundColor Cyan
-        Write-Host "=========================" -ForegroundColor Cyan
-        
-        # Scan Mode configuration (NEW!)
+        Write-Host "=========================" -ForegroundColor Cyan        
+        # Scan Mode configuration
         Write-Host ""
-        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow        Write-Host "💡 Choose scanning strategy for network filtering detection:" -ForegroundColor Gray
+        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow
+        Write-Host "💡 Choose scanning strategy for network filtering detection:" -ForegroundColor Gray
         Write-Host "   🏓 ping  - ICMP ping only (traditional mode)" -ForegroundColor White
         Write-Host "   🚪 port  - Port scanning only (bypass ICMP blocks)" -ForegroundColor White
         Write-Host "   🔄 both  - Ping + Port scan (comprehensive analysis)" -ForegroundColor White
@@ -450,8 +561,7 @@ function Get-ScanConfiguration {
         if (-not [string]::IsNullOrWhiteSpace($jumpInput) -and $jumpInput -match '^\d+$') {
             $script:Jump = [int]$jumpInput
         }
-        
-        if ($script:Jump -gt 0) {
+          if ($script:Jump -gt 0) {
             # Skip Limit configuration
             Write-Host ""
             Write-Host "🛑 Skip Limit (current: $DefaultSkip)" -ForegroundColor Yellow
@@ -461,6 +571,17 @@ function Get-ScanConfiguration {
             if (-not [string]::IsNullOrWhiteSpace($skipInput) -and $skipInput -match '^\d+$') {
                 $script:Skip = [int]$skipInput
             }
+        }
+        
+        # Max Responses configuration
+        Write-Host ""
+        Write-Host "🎯 Max Responses per Range (current: $DefaultMaxResponses)" -ForegroundColor Yellow
+        Write-Host "💡 Stop scanning a range after finding this many responsive IPs" -ForegroundColor Gray
+        Write-Host "💡 Useful for dense networks to avoid scanning unnecessary IPs" -ForegroundColor Gray
+        Write-Host "📋 Common values: 5 (quick), 10 (balanced), 0 (disabled)" -ForegroundColor Gray
+        $maxResponsesInput = Read-Host "👉 Enter max responses (0=disabled) or press Enter for default ($DefaultMaxResponses)"
+        if (-not [string]::IsNullOrWhiteSpace($maxResponsesInput) -and $maxResponsesInput -match '^\d+$') {
+            $script:MaxResponses = [int]$maxResponsesInput
         }
         
         Write-Host ""
@@ -474,8 +595,8 @@ function Get-ScanConfiguration {
 # MAIN EXECUTION
 # =====================================
 
-# Determine if we're in interactive mode (missing key parameters)
-$InteractiveMode = (-not $PSBoundParameters.ContainsKey('InputFile')) -or (-not $PSBoundParameters.ContainsKey('OutputFile'))
+# Determine if we're in interactive mode (NO parameters provided)
+$InteractiveMode = $PSBoundParameters.Count -eq 0
 
 if ($InteractiveMode) {
     # Interactive Mode - get all configuration from user
@@ -499,15 +620,15 @@ if ($InteractiveMode) {
     } else {
         $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
         $outputPath = Join-Path -Path $scriptPath -ChildPath $OutputFile
-    }
-      # Get scan configuration (only if not provided via command line)
+    }      # Get scan configuration (only if not provided via command line)
     if ((-not $PSBoundParameters.ContainsKey('ScanMode')) -or
         (-not $PSBoundParameters.ContainsKey('Ports')) -or
         (-not $PSBoundParameters.ContainsKey('PortTimeout')) -or
         (-not $PSBoundParameters.ContainsKey('Timeout')) -or 
         (-not $PSBoundParameters.ContainsKey('MaxFailures')) -or 
         (-not $PSBoundParameters.ContainsKey('Jump')) -or 
-        (-not $PSBoundParameters.ContainsKey('Skip'))) {
+        (-not $PSBoundParameters.ContainsKey('Skip')) -or
+        (-not $PSBoundParameters.ContainsKey('MaxResponses'))) {
         Get-ScanConfiguration
     }
       # Show final configuration summary
@@ -522,12 +643,16 @@ if ($InteractiveMode) {
     if ($ScanMode -eq "port" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
         Write-Host "   Port Timeout: ${PortTimeout}ms" -ForegroundColor White
         Write-Host "   Ports to Scan: $Ports" -ForegroundColor White
-    }
-    Write-Host "   Max Failures: $MaxFailures" -ForegroundColor White
+    }    Write-Host "   Max Failures: $MaxFailures" -ForegroundColor White
     if ($Jump -gt 0) {
         Write-Host "   Jump Mode: $Jump IPs (skip range after $Skip jumps)" -ForegroundColor White
     } else {
         Write-Host "   Jump Mode: Disabled" -ForegroundColor White
+    }
+    if ($MaxResponses -gt 0) {
+        Write-Host "   Max Responses: $MaxResponses per range" -ForegroundColor White
+    } else {
+        Write-Host "   Max Responses: Disabled" -ForegroundColor White
     }
     Write-Host ""# Ask for final confirmation
     Write-Host "🚀 Ready to start scanning? (Y/n): " -ForegroundColor Yellow -NoNewline
@@ -893,8 +1018,8 @@ $ipRanges = Import-Csv -Path $inputPath -Header IP,Location,Region,City,PostalCo
 foreach ($entry in $ipRanges) {
     $ipRange = $entry.IP
     
-    # Skip empty lines
-    if ([string]::IsNullOrWhiteSpace($ipRange)) {
+    # Skip empty lines and comment lines (starting with #)
+    if ([string]::IsNullOrWhiteSpace($ipRange) -or $ipRange.StartsWith('#')) {
         continue
     }
     
@@ -932,20 +1057,22 @@ foreach ($entry in $ipRanges) {
     if ($null -eq $range) {
         Write-Host "[ERROR] Failed to calculate range for: $ipRange"
         continue
-    }      # Initialize counters for this range
+    }    # Initialize counters for this range
     $successful = @()
     $totalIPs = ($range.EndIP - $range.StartIP + 1)
     $jumpCount = 0
     $currentPosition = $range.StartIP
-    
-    Write-Host "  Range contains $totalIPs IPs (from $(ConvertTo-IPString -IPInt $range.StartIP) to $(ConvertTo-IPString -IPInt $range.EndIP))" -ForegroundColor Yellow
+    $maxResponsesReached = $false
+      Write-Host "  Range contains $totalIPs IPs (from $(ConvertTo-IPString -IPInt $range.StartIP) to $(ConvertTo-IPString -IPInt $range.EndIP))" -ForegroundColor Yellow
     if ($Jump -gt 0) {
         Write-Host "  Jump mode enabled: will skip $Jump IPs after $MaxFailures failures (skip range after $Skip jumps)" -ForegroundColor Yellow
     }
+    if ($MaxResponses -gt 0) {
+        Write-Host "  Response limit enabled: will skip range after $MaxResponses successful responses" -ForegroundColor Yellow
+    }
     Write-Host "  Testing first $MaxFailures IPs for connectivity..." -ForegroundColor Yellow
-    
-    # Main scanning loop with jump functionality
-    while ($currentPosition -le $range.EndIP) {
+      # Main scanning loop with jump functionality
+    while ($currentPosition -le $range.EndIP -and -not $maxResponsesReached) {
         # Check if we've exceeded the skip limit
         if ($jumpCount -ge $Skip -and $Jump -gt 0) {
             Write-Host "  Skipping remaining IPs in range $ipRange due to $jumpCount/$Skip jumps reached." -ForegroundColor Red
@@ -1000,9 +1127,7 @@ foreach ($entry in $ipRanges) {
                         $statusText += " [FILTERING: $($scanResult.FilteringDetected)]"
                     }
                     Write-Host "  ✓ $currentIP - $statusText" -ForegroundColor Green
-                }
-                
-                # Add to successful list
+                }                # Add to successful list
                 $successful += $currentIP
                 
                 # Save to the output file based on scan mode
@@ -1031,7 +1156,12 @@ foreach ($entry in $ipRanges) {
                     }
                 }
                 
-                $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation                # Check if we've reached the maximum number of responses for this range
+                if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                    Write-Host "  Reached maximum responses ($MaxResponses) for range $ipRange - skipping remaining IPs" -ForegroundColor Yellow
+                    $maxResponsesReached = $true
+                    break  # Exit the inner IP scanning loop for this batch
+                }
             }
         }
         

@@ -1,5 +1,12 @@
 # Contributing to PowerPinger
 
+## 📚 Navigation
+[🏠 Main README](README.md) | [🚀 Quick Start](QUICKSTART.md) | [🔧 Enhanced Features](ENHANCED_FEATURES.md) | [📋 Changelog](CHANGELOG.md)
+
+**Languages**: [کوردی](README_KU.md) | [فارسی](README_FA.md) | [English](README.md)
+
+---
+
 Thank you for your interest in contributing to PowerPinger! This guide will help you get started.
 
 ## 🚀 Getting Started
@@ -86,5 +93,11 @@ Use clear, descriptive commit messages:
 - Join our community discussions
 - Ask questions in pull request comments
 - Contact maintainers for significant contributions
+
+## 📦 Recent Features (v2.1.0)
+- **MaxResponses Parameter**: Limits successful responses per range for performance optimization
+- **Enhanced Exit Logic**: Proper flag-based mechanism for range scanning termination
+- **Interactive Configuration**: Extended configuration options in interactive mode
+- **Multilingual Documentation**: Support for Kurdish, Farsi, and English documentation
 
 Thank you for helping make PowerPinger better! 🎉
