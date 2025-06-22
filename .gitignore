@@ -1,0 +1,43 @@
+# PowerPinger .gitignore
+
+# Real IP data files (exclude from public repo)
+do.csv
+do-*.csv
+
+# Result files (exclude output data)
+*results*.csv
+Found_*.csv
+*test*.csv
+*demo*.csv
+ping_results.csv
+
+# Temporary files
+*.tmp
+*.temp
+
+# PowerShell execution files
+*.ps1xml
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+
+# Keep sample files (these should be included)
+!sample_*.csv
+!ip_list.csv
+!sample_ranges.txt
+
+# Documentation and code files (include these)
+!*.md
+!*.ps1
+!LICENSE
+!*.bat

@@ -1,0 +1,16 @@
+IP,Country,Region,City,PostalCode
+8.8.8.8,US,CA,Mountain View,94043
+8.8.4.4,US,CA,Mountain View,94043
+1.1.1.1,US,CA,San Francisco,94107
+1.0.0.1,US,CA,San Francisco,94107
+208.67.222.222,US,CA,San Francisco,94107
+208.67.220.220,US,CA,San Francisco,94107
+9.9.9.9,US,CA,Berkeley,94704
+149.112.112.112,US,CA,Berkeley,94704
+76.76.19.19,US,VA,Reston,20190
+76.76.76.76,US,VA,Reston,20190
+192.168.1.0/24,Private,LAN,Local Network,00000
+10.0.0.0/16,Private,LAN,Local Network,00000
+172.16.0.0/24,Private,LAN,Local Network,00000
+203.0.113.0/24,Example,Test,Reserved Range,00000
+198.51.100.0/24,Example,Test,Reserved Range,00000
