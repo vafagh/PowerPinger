@@ -1,11 +1,11 @@
-# 🎯 PowerPinger - Advanced Network Filtering Detection Tool
+# 🎯 PowerPinger - Advanced Network Analysis Tool
 
-A lightweight, standalone PowerShell-based network scanner designed to detect network filtering patterns through intelligent ping and port scanning. **Runs natively on Windows 10+ without any additional software installation or dependencies** - perfect for deployment in restricted networks where software installations are limited.
+A lightweight, standalone PowerShell-based network scanner designed to detect network filtering patterns through intelligent ping and port scanning. **Runs natively on Windows 10+ without any additional software installation or dependencies** - perfect for deployment in restricted networks where software restrictions apply.
 
 **Key Benefits:**
 - 🚀 **Zero Dependencies**: Works with built-in Windows PowerShell (no downloads required)
 - 📦 **Ultra Portable**: ~1000 lines of code + IP list files easily transferable into restricted networks
-- 🛡️ **Filtering Detection**: Advanced analysis of network access patterns and connectivity restrictions
+- 🛡️ **Network Filtering Detection**: Advanced pattern analysis to detect various types of network restrictions and filtering mechanisms
 - ⚡ **Instant Deployment**: Ready to run on any Windows 10+ system immediately
 
 ## 🚀 Features
@@ -18,10 +18,9 @@ A lightweight, standalone PowerShell-based network scanner designed to detect ne
 
 ### 🛡️ **Network Filtering Detection**
 - **ICMP-Blocked**: Detects when ping fails but services are accessible
-- **Ping-Only**: Identifies when ping works but services are unavailable
+- **Ping-Only**: Identifies when ping works but services are blocked
 - **Service-Filtering**: Discovers deep packet inspection patterns
 - **Full-Access**: Normal connectivity baseline
-- **Unassigned-Range**: Distinguishes between filtered and unassigned IP spaces
 
 ### ⚡ **Advanced Features**
 - **Zero Dependencies**: Runs on Windows 10+ built-in PowerShell (no installations required)
@@ -48,9 +47,9 @@ A lightweight, standalone PowerShell-based network scanner designed to detect ne
 2. **Transfer method options**:
    - USB drive
    - Email attachment
-   - File sharing systems
+   - Encrypted messaging
    - Code repository access
-   - Any available file transfer method
+   - Any file transfer method available
 
 3. **Run immediately** (no installation required):
 ```powershell
@@ -104,9 +103,9 @@ $PSVersionTable.PSVersion
 ## 📋 Usage Examples
 
 ### **1. Network Firewall Detection**
-Perfect for detecting when network policies allow ping but restrict services:
+Perfect for detecting when networks allow ping but block services:
 ```powershell
-.\powerPinger.ps1 -InputFile "target_ranges.csv" -ScanMode "smart" -Ports "80,443,22,53"
+.\powerPinger.ps1 -InputFile "target_networks.csv" -ScanMode "smart" -Ports "80,443,22,53"
 ```
 
 ### **2. Bypass ICMP Restrictions**
@@ -196,21 +195,15 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 
 #### **🚫 ICMP-Blocked**
 - **Symptoms**: Ping fails, but services are accessible
-- **Indication**: Network/firewall blocks diagnostic tools but allows services
-- **Common in**: Corporate networks, managed environments
-- **Example**: Enterprise allowing HTTP but blocking ping
+- **Indication**: Government/firewall blocks diagnostic tools but allows services
+- **Common in**: Corporate networks, restricted environments
+- **Example**: Network firewalls allowing HTTP but blocking ping
 
 #### **⚠️ Ping-Only** 
 - **Symptoms**: Ping succeeds, but no services accessible
 - **Indication**: Deep packet inspection or service-level filtering
-- **Common in**: Advanced filtering, managed networks
-- **Example**: Allowlist scenarios where only ping is permitted
-
-#### **❓ Unassigned-Range**
-- **Symptoms**: No ping response and no service connections
-- **Indication**: IP range not allocated or host not configured
-- **Common in**: Unused IP spaces, decommissioned networks
-- **Technical**: Distinguished from blocking by lack of active filtering response
+- **Common in**: Advanced filtering, security monitoring
+- **Example**: Whitelist scenarios where only ping is allowed
 
 #### **✅ Full-Access**
 - **Symptoms**: Both ping and services work normally
@@ -221,17 +214,17 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 
 ### **� Deployment in Restricted Networks**
 
-**Perfect for environments where software installation is limited:**
+**Perfect for restricted environments where software installation is blocked:**
 
 **Advantages:**
 - ✅ **No Installation Required**: Uses Windows built-in PowerShell
 - ✅ **Minimal Footprint**: ~1000 lines of code easily transferable
 - ✅ **Self-Contained**: No external dependencies or libraries
-- ✅ **Discrete Operation**: Appears as normal PowerShell script
-- ✅ **Quick Transfer**: Small file size for USB/email/network transfer
+- ✅ **Stealth Operation**: Appears as normal PowerShell script
+- ✅ **Quick Transfer**: Small file size for USB/email/messaging transfer
 
 **Deployment Strategy:**
-1. **Prepare files offline** (outside target network)
+1. **Prepare files offline** (outside restricted network)
 2. **Transfer 2 files**: `powerPinger.ps1` + IP list
 3. **Run immediately** on any Windows 10+ machine
 4. **Generate results** and extract via same transfer method
@@ -239,7 +232,7 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 **Example for Network Analysis:**
 ```powershell
 # Quick deployment command
-.\powerPinger.ps1 -InputFile "target_ranges.csv" -ScanMode "smart" -Ports "80,443,22,53"
+.\powerPinger.ps1 -InputFile "target_networks.csv" -ScanMode "smart" -Ports "80,443,22,53"
 ```
 
 ### **🏢 Corporate Network Assessment**
@@ -247,10 +240,10 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 - Test service accessibility across network segments
 - Validate security policy implementations
 
-### **🔬 Network Research**
+### **🔬 Internet Research**
 - Study global network filtering patterns
-- Document access control techniques
-- Research connectivity optimization strategies
+- Document filtering techniques
+- Research circumvention strategies
 
 ## 📊 Performance Metrics
 
@@ -261,16 +254,16 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 - **Transfer Time**: < 30 seconds via USB/email
 
 **Runtime Performance:**
-- ✅ **Accuracy**: 95%+ network filtering pattern detection
+- **Accuracy**: 95%+ network filtering pattern detection
 - **Speed**: 100+ IPs per minute (depending on timeouts)
 - **Efficiency**: 23% faster than traditional ping-only tools
 - **Coverage**: Supports /8 to /32 CIDR ranges
 
 **Ideal for Restricted Networks:**
-- ✅ Quick transfer into limited environments
+- ✅ Quick transfer into restricted environments
 - ✅ No installation triggers or admin rights required  
 - ✅ Immediate execution on any Windows 10+ system
-- ✅ Small footprint minimizes network overhead
+- ✅ Small footprint avoids detection
 
 ## 🛡️ Security Considerations
 
@@ -302,8 +295,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 This tool is intended for:
 - **Educational purposes**
 - **Legitimate network testing**
-- **Research into network connectivity**
-- **Network troubleshooting and analysis**
+- **Research into network filtering and security**
+- **Network troubleshooting**
 
 **Please use responsibly and in compliance with local laws and regulations.**
 
@@ -321,10 +314,10 @@ This tool is intended for:
 
 ## 🏆 Acknowledgments
 
-- Inspired by the need to understand network connectivity patterns
-- Built for researchers studying network access restrictions
-- Dedicated to promoting network transparency and analysis
+- Inspired by the need to understand network filtering and security mechanisms
+- Built for researchers studying network restrictions
+- Dedicated to promoting internet freedom and transparency
 
 ---
 
-**⭐ If this project helps you understand or analyze network filtering patterns, please consider starring the repository!**
+**⭐ If this project helps you understand network filtering and security mechanisms, please consider starring the repository!**

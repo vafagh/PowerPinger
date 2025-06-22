@@ -1,16 +1,16 @@
-# PowerPinger Port Scanning & Censorship Detection Analysis
+# PowerPinger Port Scanning & Network Filtering Detection Analysis
 
 ## Overview
-The enhanced PowerPinger script now successfully detects network censorship patterns by combining ICMP ping testing with TCP port scanning. This provides deep insights into how firewalls and censorship systems operate.
+The enhanced PowerPinger script now successfully detects network filtering patterns by combining ICMP ping testing with TCP port scanning. This provides deep insights into how firewalls and filtering systems operate.
 
 ## Key Findings from Current Test
 
 ### Summary Statistics
 - **Total IPs Tested**: 26
 - **Clean Access**: 20 IPs (77%)
-- **Censorship Detected**: 6 IPs (23%)
+- **Filtering Detected**: 6 IPs (23%)
 
-### Censorship Patterns Identified
+### Network Filtering Patterns Identified
 
 #### 1. ICMP-Blocked (4 IPs - 15%)
 These IPs show **services accessible but ping blocked**:
@@ -19,9 +19,9 @@ These IPs show **services accessible but ping blocked**:
 - `24.144.80.24` - Ping: Failed, Ports: 80,443,22 (HTTP/HTTPS/SSH working)
 - `24.144.80.29` - Ping: Failed, Ports: 22 (SSH working)
 
-**Analysis**: These systems have ICMP ping blocked at the firewall level but allow TCP connections to services. This is common in enterprise environments or censorship systems that block diagnostic tools while allowing actual services.
+**Analysis**: These systems have ICMP ping blocked at the firewall level but allow TCP connections to services. This is common in enterprise environments or security systems that block diagnostic tools while allowing actual services.
 
-#### 2. Ping-Only / Likely Censored (2 IPs - 8%)
+#### 2. Ping-Only / Likely Filtered (2 IPs - 8%)
 These IPs show **ping works but no services accessible**:
 - `24.144.80.5` - Ping: Success (47ms), Ports: None
 - `24.144.80.14` - Ping: Success (59ms), Ports: None
@@ -40,8 +40,8 @@ These IPs show **normal connectivity**:
 
 ## Technical Capabilities Demonstrated
 
-### 1. Smart Censorship Detection
-The script successfully identified three distinct censorship patterns:
+### 1. Smart Network Filtering Detection
+The script successfully identified three distinct filtering patterns:
 - **ICMP-Blocked**: Services work, ping doesn't
 - **Ping-Only**: Ping works, services don't  
 - **Full-Access**: Both ping and services work
@@ -55,7 +55,7 @@ Testing multiple ports (80, 443, 22, 53, 8080, 8443) revealed:
 ### 3. Real-Time Detection
 The script provides immediate feedback showing:
 ```
-✓ 24.144.80.24 - ping: Failed (Timeout), ports: 80,443,22 [CENSORSHIP: ICMP-Blocked]
+✓ 24.144.80.24 - ping: Failed (Timeout), ports: 80,443,22 [FILTERING: ICMP-Blocked]
 ✓ 24.144.80.5 - ping: Success (47ms), ports: None [CENSORSHIP: Ping-Only]
 ```
 

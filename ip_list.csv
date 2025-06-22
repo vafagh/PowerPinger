@@ -1,4 +1,4 @@
-IP,Country,Region,City,PostalCode
+IP,Location,Region,City,PostalCode
 8.8.8.8,US,CA,Mountain View,94043
 1.1.1.1,US,CA,San Francisco,94107
 208.67.222.222,US,CA,San Francisco,94107

@@ -29,7 +29,7 @@ This will guide you through:
 .\powerPinger.ps1 -InputFile "sample_ips.csv" -OutputFile "my_results.csv"
 ```
 
-#### Smart Censorship Detection
+#### Smart Network Filtering Detection
 ```powershell
 .\powerPinger.ps1 -InputFile "sample_ips.csv" -ScanMode "smart" -Ports "80,443,22"
 ```
@@ -48,9 +48,9 @@ IP,Location,Ping Time (ms)
 1.1.1.1,"US,CA,San Francisco,94107",12
 ```
 
-### Smart Mode (Censorship Detection)
+### Smart Mode (Network Filtering Detection)
 ```csv
-IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Censorship Detected
+IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detected
 8.8.8.8,"US,CA,Mountain View,94043",Success,15,"80,443",Accessible,No
 203.0.113.5,"Example,Test,Documentation,00000",Failed,Timeout,"80,443",Services-Only,ICMP-Blocked
 ```
@@ -78,7 +78,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 | Status | Meaning |
 |--------|---------|
-| **No Censorship** | Both ping and ports work |
+| **No Filtering** | Both ping and ports work |
 | **ICMP-Blocked** | Ping fails, services work |
 | **Ping-Only** | Ping works, no services |
 | **Full Block** | Nothing responds |
@@ -86,7 +86,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ## 🎯 Use Cases
 
 - **Network Testing**: Verify connectivity
-- **Censorship Research**: Detect filtering patterns  
+- **Network Analysis**: Detect filtering patterns  
 - **Security Assessment**: Check service availability
 - **Troubleshooting**: Diagnose network issues
 

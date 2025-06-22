@@ -59,7 +59,7 @@ $DefaultPortTimeout = 3000                      # Port connection timeout in mil
 # .\powerPinger.ps1 -InputFile "do.csv"        # Uses specific input file, interactive output
 # .\powerPinger.ps1 -Timeout 5000               # Uses 5 second timeout, interactive file selection
 # .\powerPinger.ps1 -Jump 0                     # Disables jumping, interactive file selection
-# .\powerPinger.ps1 -ScanMode smart             # Smart censorship detection mode
+# .\powerPinger.ps1 -ScanMode smart             # Smart filtering detection mode
 # .\powerPinger.ps1 -ScanMode port -Ports "80,443,22"  # Port-only scanning
 # .\powerPinger.ps1 -InputFile "do.csv" -OutputFile "results.csv"  # Full command line mode
 
@@ -131,7 +131,7 @@ function Show-ProgramCapabilities {
     Write-Host "   • Jump mode: Skip unresponsive IP blocks" -ForegroundColor White
     Write-Host "   • Range skipping: Avoid scanning dead ranges" -ForegroundColor White
     Write-Host "   • Port scanning: Test service accessibility" -ForegroundColor White
-    Write-Host "   • Censorship detection: Identify network filtering" -ForegroundColor White
+    Write-Host "   • Network filtering detection: Identify access patterns" -ForegroundColor White
     Write-Host "   • Multiple scan modes: ping/port/both/smart" -ForegroundColor White
     Write-Host "   • PowerShell 5.1 & 6+ compatibility" -ForegroundColor White
     Write-Host "   • IPv6 range detection (auto-skip)" -ForegroundColor White
@@ -189,7 +189,7 @@ function Show-ParameterInfo {
     Write-Host "   → Full command-line mode, no jumping" -ForegroundColor Gray
     Write-Host ""
     Write-Host ".\powerPinger.ps1 -ScanMode smart -Ports `"80,443,22`"" -ForegroundColor Cyan
-    Write-Host "   → Smart censorship detection with web/SSH ports" -ForegroundColor Gray
+    Write-Host "   → Smart filtering detection with web/SSH ports" -ForegroundColor Gray
     Write-Host ""
     Write-Host ".\powerPinger.ps1 -ScanMode port -Ports `"80,443`" -PortTimeout 5000" -ForegroundColor Cyan
     Write-Host "   → Port-only scanning for HTTP/HTTPS services" -ForegroundColor Gray
@@ -380,13 +380,12 @@ function Get-ScanConfiguration {
         
         # Scan Mode configuration (NEW!)
         Write-Host ""
-        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow
-        Write-Host "💡 Choose scanning strategy for censorship detection:" -ForegroundColor Gray
+        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow        Write-Host "💡 Choose scanning strategy for network filtering detection:" -ForegroundColor Gray
         Write-Host "   🏓 ping  - ICMP ping only (traditional mode)" -ForegroundColor White
         Write-Host "   🚪 port  - Port scanning only (bypass ICMP blocks)" -ForegroundColor White
         Write-Host "   🔄 both  - Ping + Port scan (comprehensive analysis)" -ForegroundColor White
-        Write-Host "   🧠 smart - Intelligent mode (detect censorship patterns)" -ForegroundColor White
-        Write-Host "📋 Recommended: 'smart' for censored networks, 'ping' for normal networks" -ForegroundColor Gray
+        Write-Host "   🧠 smart - Intelligent mode (detect filtering patterns)" -ForegroundColor White
+        Write-Host "📋 Recommended: 'smart' for filtered networks, 'ping' for normal networks" -ForegroundColor Gray
         $modeInput = Read-Host "👉 Enter scan mode (ping/port/both/smart) or press Enter for default ($DefaultScanMode)"
         if (-not [string]::IsNullOrWhiteSpace($modeInput) -and $modeInput -match '^(ping|port|both|smart)$') {
             $script:ScanMode = $modeInput.ToLower()
@@ -651,13 +650,25 @@ function Test-Port {
         
         if ($result -and $tcpClient.Connected) {
             $tcpClient.Close()
-            return $true
+            return @{ Status = "Open"; Type = "Connected" }
         } else {
             $tcpClient.Close()
-            return $false
+            # Check if it was a timeout or connection refused
+            if ($connectTask.Exception -and $connectTask.Exception.InnerException -match "refused|reset") {
+                return @{ Status = "Closed"; Type = "Refused" }
+            } else {
+                return @{ Status = "Closed"; Type = "Timeout" }
+            }
+        }
+    } catch [System.Net.Sockets.SocketException] {
+        # Handle specific socket exceptions
+        if ($_.Exception.Message -match "refused|reset") {
+            return @{ Status = "Closed"; Type = "Refused" }
+        } else {
+            return @{ Status = "Closed"; Type = "Timeout" }
         }
     } catch {
-        return $false
+        return @{ Status = "Closed"; Type = "Timeout" }
     }
 }
 
@@ -670,16 +681,28 @@ function Test-PortScan {
     )
     
     $openPorts = @()
+    $refusedPorts = @()
+    $timedOutPorts = @()
     $ports = $PortList -split ','
     
     foreach ($port in $ports) {
         $portNum = [int]$port.Trim()
-        if (Test-Port -IP $IP -Port $portNum -TimeoutMs $TimeoutMs) {
+        $portResult = Test-Port -IP $IP -Port $portNum -TimeoutMs $TimeoutMs
+        
+        if ($portResult.Status -eq "Open") {
             $openPorts += $portNum
+        } elseif ($portResult.Type -eq "Refused") {
+            $refusedPorts += $portNum
+        } else {
+            $timedOutPorts += $portNum
         }
     }
     
-    return $openPorts
+    return @{
+        Open = $openPorts
+        Refused = $refusedPorts
+        Timeout = $timedOutPorts
+    }
 }
 
 # Perform comprehensive scan based on mode
@@ -700,7 +723,7 @@ function Invoke-ComprehensiveScan {
         PingTime = "N/A"
         PortsOpen = "Not Tested"
         ServiceStatus = "Unknown"
-        CensorshipDetected = "No"
+        FilteringDetected = "No"
     }
     
     $pingSuccessful = $false
@@ -733,31 +756,67 @@ function Invoke-ComprehensiveScan {
             $result.PingTime = $ping.ResponseTime
         } else {
             $result.PingResult = "Failed"
-            $result.PingTime = "Timeout"
-        }
+            $result.PingTime = "Timeout"        }
     }
     
     # Perform port test if required
     if ($ScanMode -eq "port" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
-        $portsOpen = Test-PortScan -IP $IP -PortList $PortList -TimeoutMs $PortTimeoutMs
+        $portScanResult = Test-PortScan -IP $IP -PortList $PortList -TimeoutMs $PortTimeoutMs
+        $portsOpen = $portScanResult.Open
+        $portsRefused = $portScanResult.Refused
+        $portsTimeout = $portScanResult.Timeout
         
         if ($portsOpen.Count -gt 0) {
             $result.PortsOpen = ($portsOpen -join ',')
             $result.ServiceStatus = "Accessible"
         } else {
             $result.PortsOpen = "None"
-            $result.ServiceStatus = "Blocked"
+            # Distinguish between refused (active host) and timeout (likely unassigned)
+            if ($portsRefused.Count -gt 0) {
+                $result.ServiceStatus = "Refused"
+            } else {
+                $result.ServiceStatus = "Unavailable"
+            }
         }
     }
     
-    # Detect potential censorship (ping works but no ports open)
+    # Detect network filtering patterns (improved logic for unassigned IPs)
     if ($ScanMode -eq "both" -or $ScanMode -eq "smart") {
-        if ($pingSuccessful -and $portsOpen.Count -eq 0) {
-            $result.CensorshipDetected = "Likely"
-            $result.ServiceStatus = "Ping-Only"
+        if ($pingSuccessful -and $portsOpen.Count -eq 0) {            # Ping works but no services
+            if ($portsRefused.Count -gt 0) {
+                # Services actively refused - normal firewall behavior
+                $result.FilteringDetected = "Likely-Filtered"
+                $result.ServiceStatus = "Ping-Only"
+            } elseif ($portsTimeout.Count -gt 0) {
+                # Services timed out - could be filtered or unassigned
+                $result.FilteringDetected = "Likely-Filtered"
+                $result.ServiceStatus = "Ping-Only"
+            } else {
+                # No ports tested or other condition
+                $result.FilteringDetected = "Likely-Filtered"
+                $result.ServiceStatus = "Ping-Only"
+            }
         } elseif (-not $pingSuccessful -and $portsOpen.Count -gt 0) {
-            $result.CensorshipDetected = "ICMP-Blocked"
+            # Services work but ping doesn't - clear indication of ICMP filtering
+            $result.FilteringDetected = "ICMP-Blocked"
             $result.ServiceStatus = "Services-Only"
+        } elseif (-not $pingSuccessful -and $portsOpen.Count -eq 0) {            # Neither ping nor services work
+            if ($portsRefused.Count -gt 0) {
+                # Services actively refused but ping blocked - ICMP filtering
+                $result.FilteringDetected = "ICMP-Blocked"
+                $result.ServiceStatus = "Services-Refused"
+            } elseif ($portsTimeout.Count -gt 0) {
+                # All services timed out and ping failed - likely unassigned IP range
+                $result.FilteringDetected = "Unassigned-Range"
+                $result.ServiceStatus = "No-Response"
+            } else {
+                # No ports tested
+                $result.FilteringDetected = "Unassigned-Range"
+                $result.ServiceStatus = "No-Response"
+            }
+        } else {
+            # Both ping and services work - normal operation
+            $result.FilteringDetected = "No"
         }
     }
     
@@ -823,13 +882,13 @@ if ($ScanMode -eq "ping") {
     "IP,Location,Ports Open,Service Status" | Out-File -FilePath $outputPath -Encoding utf8
 } else {
     # both or smart mode - include all columns
-    "IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Censorship Detected" | Out-File -FilePath $outputPath -Encoding utf8
+    "IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detected" | Out-File -FilePath $outputPath -Encoding utf8
 }
 
 # Process the input file
 Write-Host "Starting to read input file..."
 
-$ipRanges = Import-Csv -Path $inputPath -Header IP,Country,Region,City,PostalCode
+$ipRanges = Import-Csv -Path $inputPath -Header IP,Location,Region,City,PostalCode
 
 foreach ($entry in $ipRanges) {
     $ipRange = $entry.IP
@@ -905,7 +964,7 @@ foreach ($entry in $ipRanges) {
             # Use comprehensive scan function for all modes
             Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
             
-            $scanResult = Invoke-ComprehensiveScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Country),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+            $scanResult = Invoke-ComprehensiveScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
             
             # Determine if this IP is considered "successful" based on scan mode
             $isSuccessful = $false
@@ -937,8 +996,8 @@ foreach ($entry in $ipRanges) {
                     $statusText = "ping: $($scanResult.PingResult)"
                     if ($scanResult.PingTime -ne "N/A") { $statusText += " ($($scanResult.PingTime)ms)" }
                     $statusText += ", ports: $($scanResult.PortsOpen)"
-                    if ($scanResult.CensorshipDetected -ne "No") {
-                        $statusText += " [CENSORSHIP: $($scanResult.CensorshipDetected)]"
+                    if ($scanResult.FilteringDetected -ne "No") {
+                        $statusText += " [FILTERING: $($scanResult.FilteringDetected)]"
                     }
                     Write-Host "  ✓ $currentIP - $statusText" -ForegroundColor Green
                 }
@@ -968,7 +1027,7 @@ foreach ($entry in $ipRanges) {
                         'Ping Time (ms)' = $scanResult.PingTime
                         'Ports Open' = $scanResult.PortsOpen
                         'Service Status' = $scanResult.ServiceStatus
-                        'Censorship Detected' = $scanResult.CensorshipDetected
+                        'Filtering Detected' = $scanResult.FilteringDetected
                     }
                 }
                 
