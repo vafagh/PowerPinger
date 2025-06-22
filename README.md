@@ -1,5 +1,7 @@
 # 🎯 PowerPinger - Advanced Network Filtering Detection Tool
 
+[کوردی](README_KU.md) | [فارسی](README_FA.md) | [**English**](README.md)
+
 A lightweight, standalone PowerShell-based network scanner designed to detect network filtering patterns through intelligent ping and port scanning. **Runs natively on Windows 10+ without any additional software installation or dependencies** - perfect for deployment in restricted networks where software installations are limited.
 
 **Key Benefits:**

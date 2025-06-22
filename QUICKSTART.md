@@ -1,5 +1,7 @@
 # PowerPinger Quick Start Guide
 
+[کوردی](QUICKSTART_KU.md) | [فارسی](QUICKSTART_FA.md) | [**English**](QUICKSTART.md)
+
 ## 🚀 5-Minute Setup
 
 ### 1. Download and Setup
