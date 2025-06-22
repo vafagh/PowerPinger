@@ -12,25 +12,25 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-    
-    - name: Test PowerShell Syntax
+      - name: Test PowerShell Syntax
       run: |
-        # Test PowerShell syntax
+        # Test PowerShell syntax using a more compatible method
         Get-Command Test-Path
         $ErrorActionPreference = "Stop"
         
-        # Check if script loads without errors
-        $script = Get-Content -Path ".\powerPinger.ps1" -Raw
-        $errors = $null
-        $tokens = $null
-        $null = [System.Management.Automation.PSParser]::Tokenize($script, [ref]$tokens, [ref]$errors)
-        
-        if ($errors.Count -gt 0) {
-          Write-Host "PowerShell syntax errors found:" -ForegroundColor Red
-          $errors | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+        # Check if script loads without errors using PowerShell AST
+        try {
+          $script = Get-Content -Path ".\powerPinger.ps1" -Raw
+          $ast = [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$null)
+          if ($ast -eq $null) {
+            Write-Host "PowerShell syntax errors found in script parsing" -ForegroundColor Red
+            exit 1
+          } else {
+            Write-Host "PowerShell syntax validation passed!" -ForegroundColor Green
+          }
+        } catch {
+          Write-Host "PowerShell syntax error: $($_.Exception.Message)" -ForegroundColor Red
           exit 1
-        } else {
-          Write-Host "PowerShell syntax validation passed!" -ForegroundColor Green
         }
     
     - name: Test Sample Data Files
@@ -83,22 +83,22 @@ jobs:
         sudo dpkg -i packages-microsoft-prod.deb
         sudo apt-get update
         sudo apt-get install -y powershell
-    
-    - name: Test PowerShell Core Compatibility
+      - name: Test PowerShell Core Compatibility
       run: |
         pwsh -Command "
           Write-Host 'PowerShell Core Version:' \$PSVersionTable.PSVersion
-          \$script = Get-Content -Path './powerPinger.ps1' -Raw
-          \$errors = \$null
-          \$tokens = \$null
-          \$null = [System.Management.Automation.PSParser]::Tokenize(\$script, [ref]\$tokens, [ref]\$errors)
-          
-          if (\$errors.Count -gt 0) {
-            Write-Host 'PowerShell Core syntax errors found:' -ForegroundColor Red
-            \$errors | ForEach-Object { Write-Host \$_ -ForegroundColor Red }
+          try {
+            \$script = Get-Content -Path './powerPinger.ps1' -Raw
+            \$ast = [System.Management.Automation.Language.Parser]::ParseInput(\$script, [ref]\$null, [ref]\$null)
+            if (\$ast -eq \$null) {
+              Write-Host 'PowerShell Core syntax errors found in script parsing' -ForegroundColor Red
+              exit 1
+            } else {
+              Write-Host 'PowerShell Core compatibility test passed!' -ForegroundColor Green
+            }
+          } catch {
+            Write-Host 'PowerShell Core syntax error:' \$_.Exception.Message -ForegroundColor Red
             exit 1
-          } else {
-            Write-Host 'PowerShell Core compatibility test passed!' -ForegroundColor Green
           }
         "
 
