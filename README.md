@@ -28,7 +28,7 @@ A comprehensive PowerShell-based network scanner designed to detect internet cen
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/PowerPinger.git
+git clone https://github.com/vafagh/PowerPinger.git
 cd PowerPinger
 ```
 
@@ -242,9 +242,9 @@ This tool is intended for:
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/PowerPinger/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/PowerPinger/discussions)
-- **Documentation**: Check the [Wiki](https://github.com/yourusername/PowerPinger/wiki)
+- **Issues**: [GitHub Issues](https://github.com/vafagh/PowerPinger/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/vafagh/PowerPinger/discussions)
+- **Documentation**: Check the [Wiki](https://github.com/vafagh/PowerPinger/wiki)
 
 ## 🏆 Acknowledgments
 
@@ -255,3 +255,6 @@ This tool is intended for:
 ---
 
 **⭐ If this project helps you understand or circumvent internet censorship, please consider starring the repository!**
+#   P o w e r P i n g e r 
+ 
+ 
