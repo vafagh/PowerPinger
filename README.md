@@ -90,7 +90,7 @@ Perfect for situations where your internet access is heavily restricted:
 **PowerPinger requires NO additional software installation!** It runs on any Windows 10+ system using the built-in PowerShell.
 
 **For Restricted/Corporate Networks:**
-1. **Download only 2 files** (~1000 lines total):
+1. **Download only 2 files** (~1500 lines total):
    - `powerPinger.ps1` (main script)
    - Your IP list file (e.g., `targets.csv`)
 

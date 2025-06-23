@@ -52,9 +52,8 @@ param (
     [int]$Jump = 16,  # Number of IPs to skip after MaxFailures (0 = disabled)
     
     [Parameter()]
-    [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)
-      [Parameter()]
-    [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both"
+    [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)    [Parameter()]
+    [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both", "parallel"
     
     [Parameter()]
     [string]$Ports = "80,443,22,53,8080,8443", # Comma-separated list of ports to scan
@@ -86,7 +85,7 @@ $DefaultJump = 16                               # Number of IPs to skip after Ma
 $DefaultSkip = 3                                # Number of jumps before skipping entire range (only applies if Jump > 0)
 
 # Port Scanning Settings (NEW!)
-$DefaultScanMode = "ping"                       # Default scan mode: "ping", "port", "both"
+$DefaultScanMode = "ping"                       # Default scan mode: "ping", "port", "both", "parallel"
 $DefaultPorts = "80,443,22,53,8080,8443"        # Default ports to scan (HTTP, HTTPS, SSH, DNS, Alt-HTTP, Alt-HTTPS)
 $DefaultPortTimeout = 3000                      # Port connection timeout in milliseconds (3 seconds)
 $DefaultMaxResponses = 10                       # Maximum successful responses before skipping range (0 = disabled)
@@ -98,6 +97,7 @@ $DefaultMaxResponses = 10                       # Maximum successful responses b
 # .\powerPinger.ps1 -Jump 0                     # Disables jumping, interactive file selection
 # .\powerPinger.ps1 -ScanMode both             # Full accessibility detection mode
 # .\powerPinger.ps1 -ScanMode port -Ports "80,443,22"  # Port-only scanning
+# .\powerPinger.ps1 -ScanMode parallel         # Fast parallel ping scanning
 # .\powerPinger.ps1 -MaxResponses 5             # Stop after 5 responses per range
 # .\powerPinger.ps1 -InputFile "do.csv" -OutputFile "results.csv"  # Full command line mode
 
@@ -278,9 +278,8 @@ function Show-ParameterInfo {
     Write-Host "-Jump <num>           " -NoNewline -ForegroundColor Green
     Write-Host "IPs to skip after failures (0=disabled, default: $DefaultJump)" -ForegroundColor White
     Write-Host "-Skip <num>           " -NoNewline -ForegroundColor Green
-    Write-Host "Jumps before skipping range (default: $DefaultSkip)" -ForegroundColor White
-    Write-Host "-ScanMode <mode>      " -NoNewline -ForegroundColor Green
-    Write-Host "Scan type: ping/port/both (default: $DefaultScanMode)" -ForegroundColor White
+    Write-Host "Jumps before skipping range (default: $DefaultSkip)" -ForegroundColor White    Write-Host "-ScanMode <mode>      " -NoNewline -ForegroundColor Green
+    Write-Host "Scan type: ping/port/both/parallel (default: $DefaultScanMode)" -ForegroundColor White
     Write-Host "-Ports <list>         " -NoNewline -ForegroundColor Green
     Write-Host "Comma-separated ports to scan (default: $DefaultPorts)" -ForegroundColor White
     Write-Host "-PortTimeout <ms>     " -NoNewline -ForegroundColor Green
@@ -303,13 +302,16 @@ function Show-ParameterInfo {
     Write-Host ""    Write-Host ".\powerPinger.ps1 -ScanMode both -Ports `"80,443,22`"" -ForegroundColor Cyan
     Write-Host "   → Full accessibility detection with web/SSH ports" -ForegroundColor Gray
     Write-Host ""
+    Write-Host ".\powerPinger.ps1 -ScanMode parallel" -ForegroundColor Cyan
+    Write-Host "   → Fast parallel ping scanning with batch processing" -ForegroundColor Gray
+    Write-Host ""
     Write-Host ".\powerPinger.ps1 -ScanMode port -Ports `"80,443`" -PortTimeout 5000" -ForegroundColor Cyan
     Write-Host "   → Port-only scanning for HTTP/HTTPS services" -ForegroundColor Gray
     Write-Host ""
 }
 
-# Determine if we're in interactive mode
-$InteractiveMode = (-not $PSBoundParameters.ContainsKey('InputFile')) -or (-not $PSBoundParameters.ContainsKey('OutputFile'))
+# Determine if we're in interactive mode - only when NO parameters provided
+$InteractiveMode = $PSBoundParameters.Count -eq 0
 
 # Show welcome screen
 Show-WelcomeScreen -IsInteractiveMode $InteractiveMode
@@ -473,7 +475,7 @@ function Get-ScanConfiguration {
     Write-Host "❓ Would you like to customize scanning parameters?" -ForegroundColor Yellow
     Write-Host "💡 Current defaults work well for most scenarios" -ForegroundColor Gray
     Write-Host ""    Write-Host "📊 Current Settings:" -ForegroundColor Cyan
-    Write-Host "   • Scan Mode: $DefaultScanMode (ping/port/both)" -ForegroundColor White
+    Write-Host "   • Scan Mode: $DefaultScanMode (ping/port/both/parallel)" -ForegroundColor White
     Write-Host "   • Timeout: ${DefaultTimeout}ms per ping" -ForegroundColor White
     Write-Host "   • Port Timeout: ${DefaultPortTimeout}ms per port" -ForegroundColor White
     Write-Host "   • Ports to Scan: $DefaultPorts" -ForegroundColor White
@@ -489,15 +491,15 @@ function Get-ScanConfiguration {
         Write-Host "=========================" -ForegroundColor Cyan
         
         # Scan Mode configuration
-        Write-Host ""
-        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow
+        Write-Host ""        Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow
         Write-Host "💡 Choose scanning strategy for network accessibility detection:" -ForegroundColor Gray
-        Write-Host "   🏓 ping  - ICMP ping only (traditional mode)" -ForegroundColor White
-        Write-Host "   🚪 port  - Port scanning only (bypass ICMP blocks)" -ForegroundColor White
-        Write-Host "   🔄 both  - Ping + Port scan (full analysis)" -ForegroundColor White
-        Write-Host "📋 Recommended: 'both' for restricted networks, 'ping' for normal networks" -ForegroundColor Gray
-        $modeInput = Read-Host "👉 Enter scan mode (ping/port/both) or press Enter for default ($DefaultScanMode)"
-        if (-not [string]::IsNullOrWhiteSpace($modeInput) -and $modeInput -match '^(ping|port|both)$') {
+        Write-Host "   🏓 ping     - ICMP ping only (traditional mode)" -ForegroundColor White
+        Write-Host "   🚪 port     - Port scanning only (bypass ICMP blocks)" -ForegroundColor White
+        Write-Host "   🔄 both     - Ping first, then port scan non-responders" -ForegroundColor White
+        Write-Host "   ⚡ parallel - Fast parallel ping with batch processing" -ForegroundColor White
+        Write-Host "📋 Recommended: 'parallel' for large ranges, 'both' for restricted networks" -ForegroundColor Gray
+        $modeInput = Read-Host "👉 Enter scan mode (ping/port/both/parallel) or press Enter for default ($DefaultScanMode)"
+        if (-not [string]::IsNullOrWhiteSpace($modeInput) -and $modeInput -match '^(ping|port|both|parallel)$') {
             $script:ScanMode = $modeInput.ToLower()
         }
         
@@ -594,9 +596,6 @@ function Get-ScanConfiguration {
 # MAIN EXECUTION
 # =====================================
 
-# Determine if we're in interactive mode (NO parameters provided)
-$InteractiveMode = $PSBoundParameters.Count -eq 0
-
 if ($InteractiveMode) {
     # Interactive Mode - get all configuration from user
     Write-Host "`n🔍 PowerPinger - Interactive Configuration" -ForegroundColor Magenta
@@ -604,33 +603,17 @@ if ($InteractiveMode) {
     Write-Host ""
     
     # Get input file
-    if (-not $PSBoundParameters.ContainsKey('InputFile')) {
-        $inputPath = Get-InputFile
-        $InputFile = Split-Path -Leaf $inputPath
-    } else {
-        $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-        $inputPath = Join-Path -Path $scriptPath -ChildPath $InputFile
-    }
+    $inputPath = Get-InputFile
+    $InputFile = Split-Path -Leaf $inputPath
     
     # Get output file
-    if (-not $PSBoundParameters.ContainsKey('OutputFile')) {
-        $outputPath = Get-OutputFile
-        $OutputFile = Split-Path -Leaf $outputPath
-    } else {
-        $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-        $outputPath = Join-Path -Path $scriptPath -ChildPath $OutputFile
-    }      # Get scan configuration (only if not provided via command line)
-    if ((-not $PSBoundParameters.ContainsKey('ScanMode')) -or
-        (-not $PSBoundParameters.ContainsKey('Ports')) -or
-        (-not $PSBoundParameters.ContainsKey('PortTimeout')) -or
-        (-not $PSBoundParameters.ContainsKey('Timeout')) -or 
-        (-not $PSBoundParameters.ContainsKey('MaxFailures')) -or 
-        (-not $PSBoundParameters.ContainsKey('Jump')) -or 
-        (-not $PSBoundParameters.ContainsKey('Skip')) -or
-        (-not $PSBoundParameters.ContainsKey('MaxResponses'))) {
-        Get-ScanConfiguration
-    }
-      # Show final configuration summary
+    $outputPath = Get-OutputFile
+    $OutputFile = Split-Path -Leaf $outputPath
+    
+    # Get scan configuration
+    Get-ScanConfiguration
+    
+    # Show final configuration summary
     Write-Host "`n🎯 Final Configuration Summary" -ForegroundColor Magenta
     Write-Host "════════════════════════════════════════════════════════════════════════════" -ForegroundColor Magenta
     Write-Host "   Input File: $InputFile" -ForegroundColor White
@@ -665,10 +648,58 @@ if ($InteractiveMode) {
     }
     
 } else {
-    # Command-line Mode - use provided parameters or defaults
+    # Command-line Mode - use provided parameters or defaults, fully non-interactive
     $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+    
+    # Validate required parameters
+    if (-not $InputFile) {
+        Write-Host "❌ ERROR: InputFile parameter is required when running in non-interactive mode." -ForegroundColor Red
+        Write-Host "💡 Usage: .\powerPinger.ps1 -InputFile 'your_file.csv' -OutputFile 'results.csv'" -ForegroundColor Yellow
+        exit 1
+    }
+    
+    if (-not $OutputFile) {
+        Write-Host "❌ ERROR: OutputFile parameter is required when running in non-interactive mode." -ForegroundColor Red
+        Write-Host "💡 Usage: .\powerPinger.ps1 -InputFile 'your_file.csv' -OutputFile 'results.csv'" -ForegroundColor Yellow
+        exit 1
+    }
+    
+    # Set up file paths
     $inputPath = Join-Path -Path $scriptPath -ChildPath $InputFile
     $outputPath = Join-Path -Path $scriptPath -ChildPath $OutputFile
+    
+    # Validate input file exists
+    if (-not (Test-Path $inputPath)) {
+        Write-Host "❌ ERROR: Input file not found: $inputPath" -ForegroundColor Red
+        exit 1
+    }
+    
+    # Show configuration summary for command-line mode
+    Write-Host "🚀 PowerPinger - Non-Interactive Mode" -ForegroundColor Green
+    Write-Host "=====================================" -ForegroundColor Green
+    Write-Host "   Input File: $InputFile" -ForegroundColor White
+    Write-Host "   Output File: $OutputFile" -ForegroundColor White
+    Write-Host "   Scan Mode: $ScanMode" -ForegroundColor White
+    if ($ScanMode -eq "ping" -or $ScanMode -eq "both" -or $ScanMode -eq "parallel") {
+        Write-Host "   Ping Timeout: ${Timeout}ms" -ForegroundColor White
+    }
+    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
+        Write-Host "   Port Timeout: ${PortTimeout}ms" -ForegroundColor White
+        Write-Host "   Ports to Scan: $Ports" -ForegroundColor White
+    }
+    Write-Host "   Max Failures: $MaxFailures" -ForegroundColor White
+    if ($Jump -gt 0) {
+        Write-Host "   Jump Mode: $Jump IPs (skip range after $Skip jumps)" -ForegroundColor White
+    } else {
+        Write-Host "   Jump Mode: Disabled" -ForegroundColor White
+    }
+    if ($MaxResponses -gt 0) {
+        Write-Host "   Max Responses: $MaxResponses per range" -ForegroundColor White
+    } else {
+        Write-Host "   Max Responses: Disabled" -ForegroundColor White
+    }
+    Write-Host ""
+    Write-Host "⚡ Starting scan automatically..." -ForegroundColor Green
 }
 
 # Helper function to convert CIDR notation to IP range
@@ -756,6 +787,209 @@ function Convert-CIDRToIPList {
 }
 
 # =====================================
+# PARALLEL PING FUNCTIONS (NEW!)
+# =====================================
+
+# Parallel ping function using runspaces for PowerShell 5.1 compatibility
+function Invoke-ParallelPing {
+    param(
+        [string[]]$IPList,
+        [int]$TimeoutMs = 1500,
+        [int]$MaxConcurrent = 50
+    )
+    
+    if ($IPList.Count -eq 0) {
+        return @()
+    }
+    
+    $results = @()
+    
+    if ($isPSCore) {
+        # PowerShell Core - use ForEach-Object -Parallel
+        $results = $IPList | ForEach-Object -Parallel {
+            try {
+                $ping = Test-Connection -ComputerName $_ -Count 1 -TimeoutSeconds ($using:TimeoutMs / 1000) -ErrorAction SilentlyContinue
+                if ($ping) {
+                    [PSCustomObject]@{
+                        IP = $_
+                        Success = $true
+                        ResponseTime = $ping.ResponseTime
+                        Status = "Success"
+                    }
+                } else {
+                    [PSCustomObject]@{
+                        IP = $_
+                        Success = $false
+                        ResponseTime = 0
+                        Status = "Timeout"
+                    }
+                }
+            } catch {
+                [PSCustomObject]@{
+                    IP = $_
+                    Success = $false
+                    ResponseTime = 0
+                    Status = "Error"
+                }
+            }
+        } -ThrottleLimit $MaxConcurrent
+    } else {
+        # PowerShell 5.1 - use runspaces
+        $runspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxConcurrent)
+        $runspacePool.Open()
+        
+        $jobs = @()
+        
+        foreach ($ip in $IPList) {
+            $scriptBlock = {
+                param($IPAddress, $Timeout)
+                try {
+                    $ping = New-Object System.Net.NetworkInformation.Ping
+                    $pingReply = $ping.Send($IPAddress, $Timeout)
+                    if ($pingReply.Status -eq "Success") {
+                        [PSCustomObject]@{
+                            IP = $IPAddress
+                            Success = $true
+                            ResponseTime = $pingReply.RoundtripTime
+                            Status = "Success"
+                        }
+                    } else {
+                        [PSCustomObject]@{
+                            IP = $IPAddress
+                            Success = $false
+                            ResponseTime = 0
+                            Status = "Timeout"
+                        }
+                    }
+                } catch {
+                    [PSCustomObject]@{
+                        IP = $IPAddress
+                        Success = $false
+                        ResponseTime = 0
+                        Status = "Error"
+                    }
+                }
+            }
+            
+            $powershell = [powershell]::Create()
+            $powershell.RunspacePool = $runspacePool
+            $powershell.AddScript($scriptBlock).AddArgument($ip).AddArgument($TimeoutMs) | Out-Null
+            
+            $jobs += [PSCustomObject]@{
+                PowerShell = $powershell
+                AsyncResult = $powershell.BeginInvoke()
+                IP = $ip
+            }
+        }
+        
+        # Collect results
+        foreach ($job in $jobs) {
+            try {
+                $result = $job.PowerShell.EndInvoke($job.AsyncResult)
+                if ($result) {
+                    $results += $result
+                }
+            } catch {
+                $results += [PSCustomObject]@{
+                    IP = $job.IP
+                    Success = $false
+                    ResponseTime = 0
+                    Status = "Error"
+                }
+            } finally {
+                $job.PowerShell.Dispose()
+            }
+        }
+        
+        $runspacePool.Close()
+        $runspacePool.Dispose()
+    }
+    
+    return $results
+}
+
+# Batch parallel ping with intelligent jumping
+function Invoke-BatchParallelPing {
+    param(
+        [uint32]$StartIP,
+        [uint32]$EndIP,
+        [int]$TimeoutMs = 1500,
+        [int]$BatchSize = 256,
+        [int]$JumpSize = 1024,
+        [string]$LocationData,
+        [string]$OutputPath
+    )
+    
+    $totalIPs = $EndIP - $StartIP + 1
+    $currentPos = $StartIP
+    $successfulIPs = @()
+    $batchNumber = 0
+    
+    Write-Host "  Starting parallel ping scan with $BatchSize IPs per batch" -ForegroundColor Yellow
+    
+    while ($currentPos -le $EndIP) {
+        $batchNumber++
+        $batchEnd = [Math]::Min($currentPos + $BatchSize - 1, $EndIP)
+        $batchIPs = @()
+        
+        # Build IP list for this batch
+        for ($ipNum = $currentPos; $ipNum -le $batchEnd; $ipNum++) {
+            $ipString = ConvertTo-IPString -IPInt $ipNum
+            if ($ipString) {
+                $batchIPs += $ipString
+            }
+        }
+        
+        if ($batchIPs.Count -eq 0) {
+            $currentPos = $batchEnd + 1
+            continue
+        }
+        
+        Write-Host "  Batch $batchNumber`: Testing $($batchIPs.Count) IPs ($(ConvertTo-IPString -IPInt $currentPos) - $(ConvertTo-IPString -IPInt $batchEnd))" -ForegroundColor Cyan
+        
+        # Perform parallel ping on batch
+        $results = Invoke-ParallelPing -IPList $batchIPs -TimeoutMs $TimeoutMs -MaxConcurrent 50
+        
+        # Process results
+        $batchSuccessful = $results | Where-Object { $_.Success }
+        
+        if ($batchSuccessful.Count -gt 0) {
+            Write-Host "    ✓ Found $($batchSuccessful.Count) responsive IPs in batch" -ForegroundColor Green
+            
+            # Save results to file and add to successful list
+            foreach ($result in $batchSuccessful) {
+                $successfulIPs += $result.IP
+                
+                # Output to CSV
+                $outputResult = [PSCustomObject]@{
+                    IP = $result.IP
+                    Location = $LocationData
+                    'Ping Time (ms)' = $result.ResponseTime
+                }
+                $outputResult | Export-Csv -Path $OutputPath -Append -NoTypeInformation
+                
+                Write-Host "    ✓ $($result.IP) - $($result.ResponseTime) ms" -ForegroundColor Green
+            }
+        } else {
+            Write-Host "    ✗ No responsive IPs found in batch" -ForegroundColor Red
+            
+            # Check if we should jump ahead for large ranges
+            $remainingIPs = $EndIP - $batchEnd
+            if ($remainingIPs -gt ($JumpSize + $BatchSize) -and $totalIPs -gt ($JumpSize + $BatchSize)) {
+                Write-Host "    🦘 Jumping $JumpSize IPs ahead due to no responses" -ForegroundColor Yellow
+                $currentPos = $batchEnd + 1 + $JumpSize
+                continue
+            }
+        }
+        
+        # Move to next batch
+        $currentPos = $batchEnd + 1
+    }
+    
+    return $successfulIPs
+}
+
+# =====================================
 # PORT SCANNING FUNCTIONS (NEW!)
 # =====================================
 
@@ -839,7 +1073,8 @@ function Invoke-NetworkScan {
         [int]$PingTimeoutMs,
         [string]$PortList,
         [int]$PortTimeoutMs,
-        [string]$LocationData
+        [string]$LocationData,
+        [bool]$SkipPing = $false  # New parameter to skip ping if already done
     )
     
     $result = [PSCustomObject]@{
@@ -853,8 +1088,10 @@ function Invoke-NetworkScan {
     }
     
     $pingSuccessful = $false
-    $portsOpen = @()    # Perform ping test if required
-    if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
+    $portsOpen = @()
+    
+    # Perform ping test if required and not skipped
+    if (($ScanMode -eq "ping" -or $ScanMode -eq "both") -and -not $SkipPing) {
         if ($isPSCore) {
             $ping = Test-Connection -ComputerName $IP -Count 1 -TimeoutSeconds ($PingTimeoutMs / 1000) -ErrorAction SilentlyContinue
         } else {
@@ -880,9 +1117,25 @@ function Invoke-NetworkScan {
             $result.PingTime = $ping.ResponseTime
         } else {
             $result.PingResult = "Failed"
-            $result.PingTime = "Timeout"        }
-    }    # Perform port test if required
-    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
+            $result.PingTime = "Timeout"
+        }
+    } elseif ($SkipPing) {
+        # If ping was skipped, assume it failed (for both mode optimization)
+        $result.PingResult = "Failed"
+        $result.PingTime = "Timeout"
+    }
+    
+    # For "both" mode: only port scan if ping failed (optimization)
+    $shouldPortScan = $false
+    if ($ScanMode -eq "port") {
+        $shouldPortScan = $true
+    } elseif ($ScanMode -eq "both") {
+        # Only port scan if ping failed or was skipped
+        $shouldPortScan = -not $pingSuccessful
+    }
+    
+    # Perform port test if required
+    if ($shouldPortScan) {
         $portScanResult = Test-PortScan -IP $IP -PortList $PortList -TimeoutMs $PortTimeoutMs
         $portsOpen = $portScanResult.Open
         $portsRefused = $portScanResult.Refused
@@ -896,26 +1149,18 @@ function Invoke-NetworkScan {
             # Distinguish between refused (active host) and timeout (likely unassigned)
             if ($portsRefused.Count -gt 0) {
                 $result.ServiceStatus = "Refused"
-            } else {                $result.ServiceStatus = "Unavailable"
+            } else {
+                $result.ServiceStatus = "Unavailable"
             }
         }
-    }# Detect network accessibility patterns (improved logic for unassigned IPs)
+    }
+    
+    # Detect network accessibility patterns (improved logic for unassigned IPs)
     if ($ScanMode -eq "both") {
         if ($pingSuccessful -and $portsOpen.Count -eq 0) {
-            # Ping works but no services
-            if ($portsRefused.Count -gt 0) {
-                # Services actively refused - normal firewall behavior
-                $result.NetworkStatus = "Limited-Access"
-                $result.ServiceStatus = "Ping-Only"
-            } elseif ($portsTimeout.Count -gt 0) {
-                # Services timed out - could be limited access or unassigned
-                $result.NetworkStatus = "Limited-Access"
-                $result.ServiceStatus = "Ping-Only"
-            } else {
-                # No ports tested or other condition
-                $result.NetworkStatus = "Limited-Access"
-                $result.ServiceStatus = "Ping-Only"
-            }
+            # Ping works - host is discovered, no need to port scan
+            $result.NetworkStatus = "Normal"
+            $result.ServiceStatus = "Ping-Responsive"
         } elseif (-not $pingSuccessful -and $portsOpen.Count -gt 0) {
             # Services work but ping doesn't - ICMP may be blocked
             $result.NetworkStatus = "ICMP-Blocked"
@@ -996,7 +1241,7 @@ Write-Host "══════════════════════�
 Write-Host ""
 
 # Initialize output CSV with appropriate headers based on scan mode
-if ($ScanMode -eq "ping") {
+if ($ScanMode -eq "ping" -or $ScanMode -eq "parallel") {
     "IP,Location,Ping Time (ms)" | Out-File -FilePath $outputPath -Encoding utf8
 } elseif ($ScanMode -eq "port") {
     "IP,Location,Ports Open,Service Status" | Out-File -FilePath $outputPath -Encoding utf8
@@ -1064,116 +1309,198 @@ foreach ($entry in $ipRanges) {
     }
     if ($MaxResponses -gt 0) {
         Write-Host "  Response limit enabled: will skip range after $MaxResponses successful responses" -ForegroundColor Yellow
-    }
-    Write-Host "  Testing first $MaxFailures IPs for connectivity..." -ForegroundColor Yellow
-      # Main scanning loop with jump functionality
-    while ($currentPosition -le $range.EndIP -and -not $maxResponsesReached) {
-        # Check if we've exceeded the skip limit
-        if ($jumpCount -ge $Skip -and $Jump -gt 0) {
-            Write-Host "  Skipping remaining IPs in range $ipRange due to $jumpCount/$Skip jumps reached." -ForegroundColor Red
-            break
-        }
+    }    Write-Host "  Testing first $MaxFailures IPs for connectivity..." -ForegroundColor Yellow
+      # Handle parallel ping mode separately
+    if ($ScanMode -eq "parallel") {
+        Write-Host "  Using parallel ping mode with batch processing" -ForegroundColor Yellow
+        $successful = Invoke-BatchParallelPing -StartIP $range.StartIP -EndIP $range.EndIP -TimeoutMs $Timeout -BatchSize 256 -JumpSize 1024 -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)" -OutputPath $outputPath
+    } else {
+        # Traditional scanning modes: ping, port, both
+        # For "both" mode: First do a quick ping sweep, then port scan non-responders
+        $pingResponders = @()
+        $nonResponders = @()
         
-        # Pre-calculate limit for the current set of IPs to check
-        $checkLimit = [Math]::Min($currentPosition + $MaxFailures - 1, $range.EndIP)
-          # Check the current set of IPs for timeouts
-        $timeoutCount = 0
-          for ($ipNum = $currentPosition; $ipNum -le $checkLimit; $ipNum++) {
-            $currentIP = ConvertTo-IPString -IPInt $ipNum
-              # Skip invalid IPs
-            if ($null -eq $currentIP) { continue }
+        if ($ScanMode -eq "both") {
+            Write-Host "  Phase 1: Quick ping sweep to identify responsive hosts" -ForegroundColor Yellow
             
-            # Use full scan function for all modes
-            Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
-            
-            $scanResult = Invoke-NetworkScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
-            
-            # Determine if this IP is considered "successful" based on scan mode
-            $isSuccessful = $false
-            if ($ScanMode -eq "ping") {
-                $isSuccessful = ($scanResult.PingResult -eq "Success")
-            } elseif ($ScanMode -eq "port") {
-                $isSuccessful = ($scanResult.PortsOpen -ne "None")            } else {
-                # both mode - successful if either ping works or ports are open
-                $isSuccessful = ($scanResult.PingResult -eq "Success") -or ($scanResult.PortsOpen -ne "None")
-            }
-            
-            if (-not $isSuccessful) {
-                $timeoutCount++
-                if ($ScanMode -eq "ping") {
-                    Write-Host "  ✗ $currentIP - No ping response" -ForegroundColor Red
-                } elseif ($ScanMode -eq "port") {
-                    Write-Host "  ✗ $currentIP - No open ports" -ForegroundColor Red
-                } else {
-                    Write-Host "  ✗ $currentIP - No response (ping: $($scanResult.PingResult), ports: $($scanResult.PortsOpen))" -ForegroundColor Red
-                }
-            } else {
-                # Display results based on scan mode
-                if ($ScanMode -eq "ping") {
-                    Write-Host "  ✓ $currentIP - $($scanResult.PingTime) ms" -ForegroundColor Green
-                } elseif ($ScanMode -eq "port") {
-                    Write-Host "  ✓ $currentIP - Ports: $($scanResult.PortsOpen)" -ForegroundColor Green
-                } else {
-                    $statusText = "ping: $($scanResult.PingResult)"
-                    if ($scanResult.PingTime -ne "N/A") { $statusText += " ($($scanResult.PingTime)ms)" }
-                    $statusText += ", ports: $($scanResult.PortsOpen)"
-                    if ($scanResult.NetworkStatus -ne "Normal") {
-                        $statusText += " [STATUS: $($scanResult.NetworkStatus)]"
-                    }
-                    Write-Host "  ✓ $currentIP - $statusText" -ForegroundColor Green
-                }                # Add to successful list
-                $successful += $currentIP
-                
-                # Save to the output file based on scan mode
-                if ($ScanMode -eq "ping") {
-                    $outputResult = [PSCustomObject]@{
-                        IP = $currentIP
-                        Location = $scanResult.Location
-                        'Ping Time (ms)' = $scanResult.PingTime
-                    }
-                } elseif ($ScanMode -eq "port") {
-                    $outputResult = [PSCustomObject]@{
-                        IP = $currentIP
-                        Location = $scanResult.Location
-                        'Ports Open' = $scanResult.PortsOpen
-                        'Service Status' = $scanResult.ServiceStatus
-                    }
-                } else {
-                    $outputResult = [PSCustomObject]@{
-                        IP = $currentIP
-                        Location = $scanResult.Location
-                        'Ping Result' = $scanResult.PingResult
-                        'Ping Time (ms)' = $scanResult.PingTime
-                        'Ports Open' = $scanResult.PortsOpen
-                        'Service Status' = $scanResult.ServiceStatus
-                        'Network Status' = $scanResult.NetworkStatus
-                    }
-                }
-                
-                $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation                # Check if we've reached the maximum number of responses for this range
+            # Quick ping sweep for "both" mode
+            for ($ipNum = $range.StartIP; $ipNum -le $range.EndIP; $ipNum++) {
                 if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
-                    Write-Host "  Reached maximum responses ($MaxResponses) for range $ipRange - skipping remaining IPs" -ForegroundColor Yellow
-                    $maxResponsesReached = $true
-                    break  # Exit the inner IP scanning loop for this batch
+                    Write-Host "  Reached maximum responses ($MaxResponses) - stopping ping sweep" -ForegroundColor Yellow
+                    break
+                }
+                
+                $currentIP = ConvertTo-IPString -IPInt $ipNum
+                if ($null -eq $currentIP) { continue }
+                
+                # Quick ping test
+                $pingResult = $null
+                if ($isPSCore) {
+                    $pingResult = Test-Connection -ComputerName $currentIP -Count 1 -TimeoutSeconds ($Timeout / 1000) -ErrorAction SilentlyContinue
+                } else {
+                    try {
+                        $pingObj = New-Object System.Net.NetworkInformation.Ping
+                        $pingReply = $pingObj.Send($currentIP, $Timeout)
+                        if ($pingReply.Status -eq "Success") {
+                            $pingResult = [PSCustomObject]@{
+                                ResponseTime = $pingReply.RoundtripTime
+                                Status = "Success"
+                            }
+                        }
+                    } catch {
+                        $pingResult = $null
+                    }
+                }
+                
+                if ($pingResult) {
+                    $pingResponders += $currentIP
+                    $successful += $currentIP
+                    
+                    # Save ping responder to output
+                    $outputResult = [PSCustomObject]@{
+                        IP = $currentIP
+                        Location = "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+                        'Ping Result' = "Success"
+                        'Ping Time (ms)' = $pingResult.ResponseTime
+                        'Ports Open' = "N/A"
+                        'Service Status' = "Ping-Responsive"
+                        'Network Status' = "Normal"
+                    }
+                    $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                    Write-Host "  ✓ $currentIP - $($pingResult.ResponseTime) ms (ping responsive)" -ForegroundColor Green
+                } else {
+                    $nonResponders += $currentIP
                 }
             }
-        }
-        
-        # Handle failures and jumping logic
-        if ($timeoutCount -ge $MaxFailures) {
-            if ($Jump -gt 0) {
-                $jumpCount++
-                Write-Host "  Jumping $Jump IPs due to $timeoutCount/$MaxFailures consecutive timeouts (jump #$jumpCount)" -ForegroundColor Yellow
-                $currentPosition = $checkLimit + 1 + $Jump
-            } else {
-                Write-Host "  Skipping remaining IPs in range $ipRange due to $timeoutCount/$MaxFailures consecutive timeouts." -ForegroundColor Red
+            
+            Write-Host "  Phase 1 complete: $($pingResponders.Count) ping responders, $($nonResponders.Count) non-responders" -ForegroundColor Cyan
+            
+            if ($nonResponders.Count -gt 0) {
+                Write-Host "  Phase 2: Port scanning non-responders for service detection" -ForegroundColor Yellow
+                
+                # Port scan non-responders
+                foreach ($ip in $nonResponders) {
+                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                        Write-Host "  Reached maximum responses ($MaxResponses) - stopping port scan" -ForegroundColor Yellow
+                        break
+                    }
+                    
+                    $scanResult = Invoke-NetworkScan -IP $ip -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)" -SkipPing $true
+                    
+                    # Check if port scan found anything
+                    if ($scanResult.PortsOpen -ne "None" -and $scanResult.PortsOpen -ne "Not Tested") {
+                        $successful += $ip
+                        
+                        $outputResult = [PSCustomObject]@{
+                            IP = $ip
+                            Location = $scanResult.Location
+                            'Ping Result' = $scanResult.PingResult
+                            'Ping Time (ms)' = $scanResult.PingTime
+                            'Ports Open' = $scanResult.PortsOpen
+                            'Service Status' = $scanResult.ServiceStatus
+                            'Network Status' = $scanResult.NetworkStatus
+                        }
+                        $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                        Write-Host "  ✓ $ip - Ports: $($scanResult.PortsOpen) [STATUS: $($scanResult.NetworkStatus)]" -ForegroundColor Green
+                    }
+                }
+            }
+        } else {            # Traditional scanning loop for ping and port modes
+        # Main scanning loop with jump functionality
+        while ($currentPosition -le $range.EndIP -and -not $maxResponsesReached) {
+            # Check if we've exceeded the skip limit
+            if ($jumpCount -ge $Skip -and $Jump -gt 0) {
+                Write-Host "  Skipping remaining IPs in range $ipRange due to $jumpCount/$Skip jumps reached." -ForegroundColor Red
                 break
             }
-        } else {
-            # Continue with next batch
-            $currentPosition = $checkLimit + 1
-        }
-    }    
+            
+            # Pre-calculate limit for the current set of IPs to check
+            $checkLimit = [Math]::Min($currentPosition + $MaxFailures - 1, $range.EndIP)
+            
+            # Check the current set of IPs for timeouts
+            $timeoutCount = 0
+            
+            for ($ipNum = $currentPosition; $ipNum -le $checkLimit; $ipNum++) {
+                $currentIP = ConvertTo-IPString -IPInt $ipNum
+                
+                # Skip invalid IPs
+                if ($null -eq $currentIP) { continue }
+                
+                # Use scan function for ping and port modes
+                Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
+                
+                $scanResult = Invoke-NetworkScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+                
+                # Determine if this IP is considered "successful" based on scan mode
+                $isSuccessful = $false
+                if ($ScanMode -eq "ping") {
+                    $isSuccessful = ($scanResult.PingResult -eq "Success")
+                } elseif ($ScanMode -eq "port") {
+                    $isSuccessful = ($scanResult.PortsOpen -ne "None")
+                }
+                
+                if (-not $isSuccessful) {
+                    $timeoutCount++
+                    if ($ScanMode -eq "ping") {
+                        Write-Host "  ✗ $currentIP - No ping response" -ForegroundColor Red
+                    } elseif ($ScanMode -eq "port") {
+                        Write-Host "  ✗ $currentIP - No open ports" -ForegroundColor Red
+                    }
+                } else {
+                    # Display results based on scan mode
+                    if ($ScanMode -eq "ping") {
+                        Write-Host "  ✓ $currentIP - $($scanResult.PingTime) ms" -ForegroundColor Green
+                    } elseif ($ScanMode -eq "port") {
+                        Write-Host "  ✓ $currentIP - Ports: $($scanResult.PortsOpen)" -ForegroundColor Green
+                    }
+                    
+                    # Add to successful list
+                    $successful += $currentIP
+                    
+                    # Save to the output file based on scan mode
+                    if ($ScanMode -eq "ping") {
+                        $outputResult = [PSCustomObject]@{
+                            IP = $currentIP
+                            Location = $scanResult.Location
+                            'Ping Time (ms)' = $scanResult.PingTime
+                        }
+                    } elseif ($ScanMode -eq "port") {
+                        $outputResult = [PSCustomObject]@{
+                            IP = $currentIP
+                            Location = $scanResult.Location
+                            'Ports Open' = $scanResult.PortsOpen
+                            'Service Status' = $scanResult.ServiceStatus
+                        }
+                    }
+                    
+                    $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                    
+                    # Check if we've reached the maximum number of responses for this range
+                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                        Write-Host "  Reached maximum responses ($MaxResponses) for range $ipRange - skipping remaining IPs" -ForegroundColor Yellow
+                        $maxResponsesReached = $true
+                        break  # Exit the inner IP scanning loop for this batch
+                    }
+                }
+            }
+            
+            # Handle failures and jumping logic
+            if ($timeoutCount -ge $MaxFailures) {
+                if ($Jump -gt 0) {
+                    $jumpCount++
+                    Write-Host "  Jumping $Jump IPs due to $timeoutCount/$MaxFailures consecutive timeouts (jump #$jumpCount)" -ForegroundColor Yellow
+                    $currentPosition = $checkLimit + 1 + $Jump
+                } else {
+                    Write-Host "  Skipping remaining IPs in range $ipRange due to $timeoutCount/$MaxFailures consecutive timeouts." -ForegroundColor Red
+                    break
+                }
+            } else {
+                # Continue with next batch
+                $currentPosition = $checkLimit + 1
+            }
+        }        }
+    }
+    
     # Display summary of reachable IPs
     if ($successful.Count -gt 0) {
         Write-Host "✓ Range ${cidrRange}: $($successful.Count)/$totalIPs IPs reachable" -ForegroundColor Green
@@ -1191,5 +1518,9 @@ foreach ($entry in $ipRanges) {
 
 Write-Host "Script completed. Results saved to '$outputPath'." -ForegroundColor Green
 Write-Host ""
-Write-Host "Press Enter to exit..." -ForegroundColor Yellow
-Read-Host | Out-Null
+
+# Only wait for input in interactive mode
+if ($InteractiveMode) {
+    Write-Host "Press Enter to exit..." -ForegroundColor Yellow
+    Read-Host | Out-Null
+}
