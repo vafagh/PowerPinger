@@ -1,13 +1,13 @@
-# 🎯 PowerPinger - Network Accessibility Scanner
+# 🎯 PowerPinger - Network Accessibility S- 🔍 **Serv- 🔧 - - �‍- - � **Ultra Portable**: Tool + IP lists = less than 18KB when zipped (can be emailed!)💾 **Zero Installation**: Uses only what comes with Windows 10/11 **Anyone in restricted networks**: Finding working internet connections🖥️ **Network professionals**: Analyzing connectivity and restrictions*Network troubleshooting**: Understanding connectivity problemsce detection**: Find which ports/services work on each IPanner
 
 ## 🌍 Languages
 [کوردی](README_KU.md) | [فارسی](README_FA.md) | [**English**](README.md)
 
 ## 📚 Documentation Navigation
-- 📖 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- 🚀 [Enhanced Features](ENHANCED_FEATURES.md) - Advanced capabilities overview
-- 📋 [Changelog](CHANGELOG.md) - Version history and updates
-- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
+- 📖 [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
+- 🚀 [Enhanced Features](docs/ENHANCED_FEATURES.md) - Advanced capabilities overview
+- 📋 [Changelog](docs/CHANGELOG.md) - Version history and updates
+- 🤝 [Contributing](docs/CONTRIBUTING.md) - Development guidelines
 
 ---
 
@@ -22,18 +22,7 @@ PowerPinger helps you **find accessible servers and internet services** when you
 - 🛡️ **Network analysis**: Understand what servers are reachable
 - 📊 **Detailed reports**: Get CSV files with all connectivity information
 
-## 🌍 Languages
-[کوردی](README_KU.md) | [فارسی](README_FA.md) | [**English**](README.md)
-
-## 📚 Documentation Navigation
-- 📖 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- 🚀 [Enhanced Features](ENHANCED_FEATURES.md) - Advanced capabilities overview
-- 📋 [Changelog](CHANGELOG.md) - Version history and updates
-- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
-
----
-
-## 🎯 What, When, and Who
+##  What, When, and Who
 
 ### 🤔 **What Does This Tool Do?**
 PowerPinger helps you **find accessible servers and internet services** when your normal internet access is restricted or limited. It scans IP addresses to discover which ones you can still reach and what services are available.
@@ -267,10 +256,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **⭐ If this tool helps you, please star the repository!**
 
 ## 📚 More Information
-- 📖 [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- 🚀 [Enhanced Features](ENHANCED_FEATURES.md) - Advanced capabilities overview
-- 📋 [Changelog](CHANGELOG.md) - Version history and updates
-- 🤝 [Contributing](CONTRIBUTING.md) - Development guidelines
-- 🎯 [MaxResponses Feature](MAXRESPONSES_FEATURE.md) - Response limiting documentation
+- 📖 [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
+- 🚀 [Enhanced Features](docs/ENHANCED_FEATURES.md) - Advanced capabilities overview
+- 📋 [Changelog](docs/CHANGELOG.md) - Version history and updates
+- 🤝 [Contributing](docs/CONTRIBUTING.md) - Development guidelines
+- 🎯 [MaxResponses Feature](docs/MAXRESPONSES_FEATURE.md) - Response limiting documentation
 
 [⬆️ Back to top](#-powerpinger---network-accessibility-scanner)

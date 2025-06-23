@@ -1,9 +1,0 @@
-# نموونەی فایلی IPەکان - کوردی
-# بۆ بەکارهێنان لەگەڵ PowerPinger
-# فۆرمات: IP,شوێن,ناوچە,شار,کۆدی پۆستە
-
-IP,Location,Region,City,PostalCode
-8.8.8.8,Google DNS,US,Mountain View,94035
-1.1.1.1,Cloudflare DNS,US,San Francisco,94107
-9.9.9.9,Quad9 DNS,CH,Zurich,8001
-208.67.222.222,OpenDNS,US,San Francisco,94107
