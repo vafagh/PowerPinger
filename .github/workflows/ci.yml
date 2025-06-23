@@ -6,13 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:
-  test-powershell:
+jobs:  test-powershell:
     runs-on: windows-latest
     
     steps:
     - uses: actions/checkout@v3
-      - name: Test PowerShell Syntax
+    
+    - name: Test PowerShell Syntax
       run: |
         # Test PowerShell syntax using a more compatible method
         Get-Command Test-Path
