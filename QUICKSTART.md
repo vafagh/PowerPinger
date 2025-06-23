@@ -99,6 +99,28 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - **Security Assessment**: Check service availability
 - **Troubleshooting**: Diagnose network issues
 
+## 🎯 What Is This Tool For?
+
+### 📖 **Quick Overview**
+PowerPinger helps you **find accessible servers and services** in restricted network environments where normal internet access is limited or filtered. It's designed for network researchers who need to map connectivity patterns and discover available infrastructure.
+
+### ⚡ **When To Use PowerPinger**
+- 🚫 **Limited Internet Access**: Your network blocks most outbound connections
+- 🔒 **No VPN/Proxy Access**: Standard bypass methods aren't available
+- 🛡️ **Network Analysis**: Need to understand what paths are open
+- 📡 **Alternative Routes**: Finding working connections through restrictions
+
+### 👥 **Who Should Use This**
+- 🔬 **Network Researchers**: Analyzing connectivity patterns
+- 🛡️ **Security Professionals**: Understanding network topology
+- 🌍 **Digital Rights Advocates**: Documenting network restrictions
+- 🔧 **System Administrators**: Troubleshooting connectivity issues
+
+### ⚠️ **Important Warning**
+**Your network activity can be monitored!** Network administrators, ISPs, and other parties may observe and log this tool's scanning activity. Only use on networks you have permission to test, and ensure compliance with local laws and policies.
+
+---
+
 ## ⚠️ Important Warning
 
 **Before using PowerPinger:**

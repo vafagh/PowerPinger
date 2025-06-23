@@ -47,6 +47,60 @@ A lightweight, standalone PowerShell-based network scanner designed to detect ne
 - **Cross-Platform**: PowerShell 5.1+ and PowerShell Core 6+ support
 - **Stealth Operation**: Appears as normal network diagnostic script
 
+## 🎯 What, When, and Who
+
+### 🤔 **What Does PowerPinger Do?**
+PowerPinger is a **network accessibility analyzer** that scans specific IPv4 addresses and IP ranges to identify which servers and services are reachable from your current network position. It exports a comprehensive list of accessible IPs with detailed connectivity information, helping you map network topology and understand filtering patterns.
+
+**Core Functions:**
+- 🔍 **Network Discovery**: Identifies live hosts and accessible services
+- 📊 **Connectivity Analysis**: Maps which IPs respond to ping vs. port connections
+- 🛡️ **Filtering Detection**: Reveals network restrictions and access patterns
+- 📋 **Accessibility Mapping**: Creates detailed reports of reachable infrastructure
+
+### ⏰ **When Is PowerPinger Useful?**
+This tool is particularly valuable in **restricted network environments** where traditional internet access is limited or filtered:
+
+- 🚫 **No Direct Internet Access**: When your network blocks most outbound connections
+- 🔒 **VPN/Proxy Restrictions**: When VPN, proxy, or bridge connections are unavailable
+- 🛡️ **Firewall Analysis**: When you need to understand what network paths are open
+- 🌐 **Network Research**: When mapping accessible infrastructure in unfamiliar networks
+- 🔧 **Connectivity Troubleshooting**: When diagnosing network access issues
+- 📡 **Alternative Route Discovery**: When finding working network paths through restrictions
+
+### 👥 **Who Should Use PowerPinger?**
+PowerPinger is designed for **network researchers and professionals** who need to analyze connectivity in challenging environments:
+
+**Primary Users:**
+- 🔬 **Network Researchers**: Analyzing internet accessibility and filtering patterns
+- 🛡️ **Security Professionals**: Understanding network topology and access controls
+- 🌍 **Digital Rights Advocates**: Documenting network restrictions and censorship
+- 🔧 **Network Administrators**: Troubleshooting connectivity and access issues
+- 📊 **Academic Researchers**: Studying internet infrastructure and accessibility
+
+**Use Cases:**
+- Finding accessible servers outside your restricted network perimeter
+- Mapping which IP ranges have reachable services despite filtering
+- Discovering alternative network paths when standard access is blocked
+- Researching network infrastructure accessibility patterns
+- Creating detailed connectivity reports for analysis
+
+### ⚠️ **Important Security Considerations**
+
+**🚨 PRIVACY & SECURITY RISKS:**
+- **Network Monitoring**: Your network administrator, ISP, or middleware can observe and log this tool's scanning activity
+- **Traffic Analysis**: Network scanning generates detectable traffic patterns that may trigger security alerts
+- **Legal Compliance**: Ensure scanning activities comply with local laws and network usage policies
+- **Professional Use**: Obtain proper authorization before scanning networks you don't own
+
+**🛡️ RESPONSIBLE USE GUIDELINES:**
+- Only scan networks you have permission to test
+- Respect rate limits and avoid overwhelming target systems
+- Consider the legal and ethical implications in your jurisdiction
+- Use appropriate security measures to protect your scanning activities
+
+---
+
 ## 📦 Installation
 
 ### **🚀 Zero-Dependency Deployment (Recommended for Restricted Networks)**
