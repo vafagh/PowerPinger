@@ -2,10 +2,10 @@
 
 <#
 .SYNOPSIS
-    PowerPinger - Advanced Network Filtering Detection Tool
+    PowerPinger - Network Accessibility Scanner
 
 .DESCRIPTION
-    A PowerShell-based network scanner for detecting network filtering patterns
+    A PowerShell-based network scanner for discovering accessible servers and services
     through intelligent ping and port scanning analysis.
 
 .NOTES
@@ -31,7 +31,7 @@
     and agree to these terms and disclaimers.
 
 .EXAMPLE
-    .\powerPinger.ps1 -InputFile "targets.csv" -ScanMode "smart"
+    .\powerPinger.ps1 -InputFile "targets.csv" -ScanMode "both"
 #>
 
 [CmdletBinding()]
@@ -54,7 +54,7 @@ param (
     [Parameter()]
     [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)
       [Parameter()]
-    [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both", "smart"
+    [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both"
     
     [Parameter()]
     [string]$Ports = "80,443,22,53,8080,8443", # Comma-separated list of ports to scan
@@ -86,7 +86,7 @@ $DefaultJump = 16                               # Number of IPs to skip after Ma
 $DefaultSkip = 3                                # Number of jumps before skipping entire range (only applies if Jump > 0)
 
 # Port Scanning Settings (NEW!)
-$DefaultScanMode = "ping"                       # Default scan mode: "ping", "port", "both", "smart"
+$DefaultScanMode = "ping"                       # Default scan mode: "ping", "port", "both"
 $DefaultPorts = "80,443,22,53,8080,8443"        # Default ports to scan (HTTP, HTTPS, SSH, DNS, Alt-HTTP, Alt-HTTPS)
 $DefaultPortTimeout = 3000                      # Port connection timeout in milliseconds (3 seconds)
 $DefaultMaxResponses = 10                       # Maximum successful responses before skipping range (0 = disabled)
@@ -96,7 +96,7 @@ $DefaultMaxResponses = 10                       # Maximum successful responses b
 # .\powerPinger.ps1 -InputFile "do.csv"        # Uses specific input file, interactive output
 # .\powerPinger.ps1 -Timeout 5000               # Uses 5 second timeout, interactive file selection
 # .\powerPinger.ps1 -Jump 0                     # Disables jumping, interactive file selection
-# .\powerPinger.ps1 -ScanMode smart             # Smart filtering detection mode
+# .\powerPinger.ps1 -ScanMode both             # Full accessibility detection mode
 # .\powerPinger.ps1 -ScanMode port -Ports "80,443,22"  # Port-only scanning
 # .\powerPinger.ps1 -MaxResponses 5             # Stop after 5 responses per range
 # .\powerPinger.ps1 -InputFile "do.csv" -OutputFile "results.csv"  # Full command line mode
@@ -239,12 +239,12 @@ function Show-ProgramCapabilities {
     Write-Host "   • Mixed formats in same file" -ForegroundColor White
     Write-Host ""
       Write-Host "⚙️ Advanced Features:" -ForegroundColor Cyan
-    Write-Host "   • Smart timeout detection" -ForegroundColor White
+    Write-Host "   • Adaptive timeout detection" -ForegroundColor White
     Write-Host "   • Jump mode: Skip unresponsive IP blocks" -ForegroundColor White
     Write-Host "   • Range skipping: Avoid scanning dead ranges" -ForegroundColor White
     Write-Host "   • Port scanning: Test service accessibility" -ForegroundColor White
-    Write-Host "   • Network filtering detection: Identify access patterns" -ForegroundColor White
-    Write-Host "   • Multiple scan modes: ping/port/both/smart" -ForegroundColor White
+    Write-Host "   • Network accessibility detection: Identify access patterns" -ForegroundColor White
+    Write-Host "   • Multiple scan modes: ping/port/both" -ForegroundColor White
     Write-Host "   • PowerShell 5.1 & 6+ compatibility" -ForegroundColor White
     Write-Host "   • IPv6 range detection (auto-skip)" -ForegroundColor White
     Write-Host ""
@@ -274,12 +274,13 @@ function Show-ParameterInfo {
     Write-Host "-Timeout <ms>         " -NoNewline -ForegroundColor Green
     Write-Host "Ping timeout in milliseconds (default: $DefaultTimeout)" -ForegroundColor White
     Write-Host "-MaxFailures <num>    " -NoNewline -ForegroundColor Green
-    Write-Host "Consecutive failures before action (default: $DefaultMaxFailures)" -ForegroundColor White    Write-Host "-Jump <num>           " -NoNewline -ForegroundColor Green
+    Write-Host "Consecutive failures before action (default: $DefaultMaxFailures)" -ForegroundColor White
+    Write-Host "-Jump <num>           " -NoNewline -ForegroundColor Green
     Write-Host "IPs to skip after failures (0=disabled, default: $DefaultJump)" -ForegroundColor White
     Write-Host "-Skip <num>           " -NoNewline -ForegroundColor Green
     Write-Host "Jumps before skipping range (default: $DefaultSkip)" -ForegroundColor White
     Write-Host "-ScanMode <mode>      " -NoNewline -ForegroundColor Green
-    Write-Host "Scan type: ping/port/both/smart (default: $DefaultScanMode)" -ForegroundColor White
+    Write-Host "Scan type: ping/port/both (default: $DefaultScanMode)" -ForegroundColor White
     Write-Host "-Ports <list>         " -NoNewline -ForegroundColor Green
     Write-Host "Comma-separated ports to scan (default: $DefaultPorts)" -ForegroundColor White
     Write-Host "-PortTimeout <ms>     " -NoNewline -ForegroundColor Green
@@ -299,9 +300,8 @@ function Show-ParameterInfo {
     Write-Host "   → Specific input, interactive output, jump 10 IPs" -ForegroundColor Gray
     Write-Host ""    Write-Host ".\powerPinger.ps1 -InputFile `"do.csv`" -OutputFile `"results.csv`" -Jump 0" -ForegroundColor Cyan
     Write-Host "   → Full command-line mode, no jumping" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host ".\powerPinger.ps1 -ScanMode smart -Ports `"80,443,22`"" -ForegroundColor Cyan
-    Write-Host "   → Smart filtering detection with web/SSH ports" -ForegroundColor Gray
+    Write-Host ""    Write-Host ".\powerPinger.ps1 -ScanMode both -Ports `"80,443,22`"" -ForegroundColor Cyan
+    Write-Host "   → Full accessibility detection with web/SSH ports" -ForegroundColor Gray
     Write-Host ""
     Write-Host ".\powerPinger.ps1 -ScanMode port -Ports `"80,443`" -PortTimeout 5000" -ForegroundColor Cyan
     Write-Host "   → Port-only scanning for HTTP/HTTPS services" -ForegroundColor Gray
@@ -473,7 +473,7 @@ function Get-ScanConfiguration {
     Write-Host "❓ Would you like to customize scanning parameters?" -ForegroundColor Yellow
     Write-Host "💡 Current defaults work well for most scenarios" -ForegroundColor Gray
     Write-Host ""    Write-Host "📊 Current Settings:" -ForegroundColor Cyan
-    Write-Host "   • Scan Mode: $DefaultScanMode (ping/port/both/smart)" -ForegroundColor White
+    Write-Host "   • Scan Mode: $DefaultScanMode (ping/port/both)" -ForegroundColor White
     Write-Host "   • Timeout: ${DefaultTimeout}ms per ping" -ForegroundColor White
     Write-Host "   • Port Timeout: ${DefaultPortTimeout}ms per port" -ForegroundColor White
     Write-Host "   • Ports to Scan: $DefaultPorts" -ForegroundColor White
@@ -485,25 +485,24 @@ function Get-ScanConfiguration {
     
     $customize = Read-Host "👉 Customize settings? (y/N)"
       if ($customize -match '^[Yy]') {
-        Write-Host ""
-        Write-Host "🔧 Advanced Configuration" -ForegroundColor Cyan
-        Write-Host "=========================" -ForegroundColor Cyan        
+        Write-Host ""        Write-Host "🔧 Advanced Configuration" -ForegroundColor Cyan
+        Write-Host "=========================" -ForegroundColor Cyan
+        
         # Scan Mode configuration
         Write-Host ""
         Write-Host "🎯 Scan Mode (current: $DefaultScanMode)" -ForegroundColor Yellow
-        Write-Host "💡 Choose scanning strategy for network filtering detection:" -ForegroundColor Gray
+        Write-Host "💡 Choose scanning strategy for network accessibility detection:" -ForegroundColor Gray
         Write-Host "   🏓 ping  - ICMP ping only (traditional mode)" -ForegroundColor White
         Write-Host "   🚪 port  - Port scanning only (bypass ICMP blocks)" -ForegroundColor White
-        Write-Host "   🔄 both  - Ping + Port scan (comprehensive analysis)" -ForegroundColor White
-        Write-Host "   🧠 smart - Intelligent mode (detect filtering patterns)" -ForegroundColor White
-        Write-Host "📋 Recommended: 'smart' for filtered networks, 'ping' for normal networks" -ForegroundColor Gray
-        $modeInput = Read-Host "👉 Enter scan mode (ping/port/both/smart) or press Enter for default ($DefaultScanMode)"
-        if (-not [string]::IsNullOrWhiteSpace($modeInput) -and $modeInput -match '^(ping|port|both|smart)$') {
+        Write-Host "   🔄 both  - Ping + Port scan (full analysis)" -ForegroundColor White
+        Write-Host "📋 Recommended: 'both' for restricted networks, 'ping' for normal networks" -ForegroundColor Gray
+        $modeInput = Read-Host "👉 Enter scan mode (ping/port/both) or press Enter for default ($DefaultScanMode)"
+        if (-not [string]::IsNullOrWhiteSpace($modeInput) -and $modeInput -match '^(ping|port|both)$') {
             $script:ScanMode = $modeInput.ToLower()
         }
         
         # Port List configuration (if port scanning enabled)
-        if ($script:ScanMode -eq "port" -or $script:ScanMode -eq "both" -or $script:ScanMode -eq "smart") {
+        if ($script:ScanMode -eq "port" -or $script:ScanMode -eq "both") {
             Write-Host ""
             Write-Host "🚪 Port Selection (current: $DefaultPorts)" -ForegroundColor Yellow
             Write-Host "💡 Common service ports to test for accessibility:" -ForegroundColor Gray
@@ -530,7 +529,7 @@ function Get-ScanConfiguration {
         }
         
         # Ping Timeout configuration (if ping enabled)
-        if ($script:ScanMode -eq "ping" -or $script:ScanMode -eq "both" -or $script:ScanMode -eq "smart") {
+        if ($script:ScanMode -eq "ping" -or $script:ScanMode -eq "both") {
             Write-Host ""
             Write-Host "⏱️  Ping Timeout (current: ${DefaultTimeout}ms)" -ForegroundColor Yellow
             Write-Host "💡 Lower = faster scanning, higher = more accurate for slow networks" -ForegroundColor Gray
@@ -637,13 +636,14 @@ if ($InteractiveMode) {
     Write-Host "   Input File: $InputFile" -ForegroundColor White
     Write-Host "   Output File: $OutputFile" -ForegroundColor White
     Write-Host "   Scan Mode: $ScanMode" -ForegroundColor White
-    if ($ScanMode -eq "ping" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
+    if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
         Write-Host "   Ping Timeout: ${Timeout}ms" -ForegroundColor White
     }
-    if ($ScanMode -eq "port" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
+    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
         Write-Host "   Port Timeout: ${PortTimeout}ms" -ForegroundColor White
         Write-Host "   Ports to Scan: $Ports" -ForegroundColor White
-    }    Write-Host "   Max Failures: $MaxFailures" -ForegroundColor White
+    }
+    Write-Host "   Max Failures: $MaxFailures" -ForegroundColor White
     if ($Jump -gt 0) {
         Write-Host "   Jump Mode: $Jump IPs (skip range after $Skip jumps)" -ForegroundColor White
     } else {
@@ -654,7 +654,8 @@ if ($InteractiveMode) {
     } else {
         Write-Host "   Max Responses: Disabled" -ForegroundColor White
     }
-    Write-Host ""# Ask for final confirmation
+    Write-Host ""
+    # Ask for final confirmation
     Write-Host "🚀 Ready to start scanning? (Y/n): " -ForegroundColor Yellow -NoNewline
     $confirm = Read-Host
     $confirm = $confirm.Trim() # Remove any whitespace
@@ -830,8 +831,8 @@ function Test-PortScan {
     }
 }
 
-# Perform comprehensive scan based on mode
-function Invoke-ComprehensiveScan {
+# Perform network scan based on mode
+function Invoke-NetworkScan {
     param(
         [string]$IP,
         [string]$ScanMode,
@@ -848,14 +849,12 @@ function Invoke-ComprehensiveScan {
         PingTime = "N/A"
         PortsOpen = "Not Tested"
         ServiceStatus = "Unknown"
-        FilteringDetected = "No"
+        NetworkStatus = "Normal"
     }
     
     $pingSuccessful = $false
-    $portsOpen = @()
-    
-    # Perform ping test if required
-    if ($ScanMode -eq "ping" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
+    $portsOpen = @()    # Perform ping test if required
+    if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
         if ($isPSCore) {
             $ping = Test-Connection -ComputerName $IP -Count 1 -TimeoutSeconds ($PingTimeoutMs / 1000) -ErrorAction SilentlyContinue
         } else {
@@ -882,10 +881,8 @@ function Invoke-ComprehensiveScan {
         } else {
             $result.PingResult = "Failed"
             $result.PingTime = "Timeout"        }
-    }
-    
-    # Perform port test if required
-    if ($ScanMode -eq "port" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
+    }    # Perform port test if required
+    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
         $portScanResult = Test-PortScan -IP $IP -PortList $PortList -TimeoutMs $PortTimeoutMs
         $portsOpen = $portScanResult.Open
         $portsRefused = $portScanResult.Refused
@@ -899,49 +896,48 @@ function Invoke-ComprehensiveScan {
             # Distinguish between refused (active host) and timeout (likely unassigned)
             if ($portsRefused.Count -gt 0) {
                 $result.ServiceStatus = "Refused"
-            } else {
-                $result.ServiceStatus = "Unavailable"
+            } else {                $result.ServiceStatus = "Unavailable"
             }
         }
-    }
-    
-    # Detect network filtering patterns (improved logic for unassigned IPs)
-    if ($ScanMode -eq "both" -or $ScanMode -eq "smart") {
-        if ($pingSuccessful -and $portsOpen.Count -eq 0) {            # Ping works but no services
+    }# Detect network accessibility patterns (improved logic for unassigned IPs)
+    if ($ScanMode -eq "both") {
+        if ($pingSuccessful -and $portsOpen.Count -eq 0) {
+            # Ping works but no services
             if ($portsRefused.Count -gt 0) {
                 # Services actively refused - normal firewall behavior
-                $result.FilteringDetected = "Likely-Filtered"
+                $result.NetworkStatus = "Limited-Access"
                 $result.ServiceStatus = "Ping-Only"
             } elseif ($portsTimeout.Count -gt 0) {
-                # Services timed out - could be filtered or unassigned
-                $result.FilteringDetected = "Likely-Filtered"
+                # Services timed out - could be limited access or unassigned
+                $result.NetworkStatus = "Limited-Access"
                 $result.ServiceStatus = "Ping-Only"
             } else {
                 # No ports tested or other condition
-                $result.FilteringDetected = "Likely-Filtered"
+                $result.NetworkStatus = "Limited-Access"
                 $result.ServiceStatus = "Ping-Only"
             }
         } elseif (-not $pingSuccessful -and $portsOpen.Count -gt 0) {
-            # Services work but ping doesn't - clear indication of ICMP filtering
-            $result.FilteringDetected = "ICMP-Blocked"
+            # Services work but ping doesn't - ICMP may be blocked
+            $result.NetworkStatus = "ICMP-Blocked"
             $result.ServiceStatus = "Services-Only"
-        } elseif (-not $pingSuccessful -and $portsOpen.Count -eq 0) {            # Neither ping nor services work
+        } elseif (-not $pingSuccessful -and $portsOpen.Count -eq 0) {
+            # Neither ping nor services work
             if ($portsRefused.Count -gt 0) {
-                # Services actively refused but ping blocked - ICMP filtering
-                $result.FilteringDetected = "ICMP-Blocked"
+                # Services actively refused but ping blocked - ICMP may be blocked
+                $result.NetworkStatus = "ICMP-Blocked"
                 $result.ServiceStatus = "Services-Refused"
             } elseif ($portsTimeout.Count -gt 0) {
                 # All services timed out and ping failed - likely unassigned IP range
-                $result.FilteringDetected = "Unassigned-Range"
+                $result.NetworkStatus = "Unassigned-Range"
                 $result.ServiceStatus = "No-Response"
             } else {
                 # No ports tested
-                $result.FilteringDetected = "Unassigned-Range"
+                $result.NetworkStatus = "Unassigned-Range"
                 $result.ServiceStatus = "No-Response"
             }
         } else {
             # Both ping and services work - normal operation
-            $result.FilteringDetected = "No"
+            $result.NetworkStatus = "Normal"
         }
     }
     
@@ -983,11 +979,10 @@ Write-Host "`n🚀 Starting operations..." -ForegroundColor Green
 Write-Host "═══════════════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host "Input file: $InputFile" -ForegroundColor Yellow
 Write-Host "Output file: $OutputFile" -ForegroundColor Yellow
-Write-Host "Scan mode: $ScanMode" -ForegroundColor Yellow
-if ($ScanMode -eq "ping" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
-    Write-Host "Ping timeout: ${Timeout}ms" -ForegroundColor Yellow
-}
-if ($ScanMode -eq "port" -or $ScanMode -eq "both" -or $ScanMode -eq "smart") {
+Write-Host "Scan mode: $ScanMode" -ForegroundColor Yellow    if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
+        Write-Host "Ping timeout: ${Timeout}ms" -ForegroundColor Yellow
+    }
+    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
     Write-Host "Port timeout: ${PortTimeout}ms" -ForegroundColor Yellow
     Write-Host "Ports to scan: $Ports" -ForegroundColor Yellow
 }
@@ -1006,8 +1001,8 @@ if ($ScanMode -eq "ping") {
 } elseif ($ScanMode -eq "port") {
     "IP,Location,Ports Open,Service Status" | Out-File -FilePath $outputPath -Encoding utf8
 } else {
-    # both or smart mode - include all columns
-    "IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detected" | Out-File -FilePath $outputPath -Encoding utf8
+    # both mode - include all columns
+    "IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Network Status" | Out-File -FilePath $outputPath -Encoding utf8
 }
 
 # Process the input file
@@ -1088,19 +1083,18 @@ foreach ($entry in $ipRanges) {
               # Skip invalid IPs
             if ($null -eq $currentIP) { continue }
             
-            # Use comprehensive scan function for all modes
+            # Use full scan function for all modes
             Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
             
-            $scanResult = Invoke-ComprehensiveScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+            $scanResult = Invoke-NetworkScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
             
             # Determine if this IP is considered "successful" based on scan mode
             $isSuccessful = $false
             if ($ScanMode -eq "ping") {
                 $isSuccessful = ($scanResult.PingResult -eq "Success")
             } elseif ($ScanMode -eq "port") {
-                $isSuccessful = ($scanResult.PortsOpen -ne "None")
-            } else {
-                # both or smart mode - successful if either ping works or ports are open
+                $isSuccessful = ($scanResult.PortsOpen -ne "None")            } else {
+                # both mode - successful if either ping works or ports are open
                 $isSuccessful = ($scanResult.PingResult -eq "Success") -or ($scanResult.PortsOpen -ne "None")
             }
             
@@ -1123,8 +1117,8 @@ foreach ($entry in $ipRanges) {
                     $statusText = "ping: $($scanResult.PingResult)"
                     if ($scanResult.PingTime -ne "N/A") { $statusText += " ($($scanResult.PingTime)ms)" }
                     $statusText += ", ports: $($scanResult.PortsOpen)"
-                    if ($scanResult.FilteringDetected -ne "No") {
-                        $statusText += " [FILTERING: $($scanResult.FilteringDetected)]"
+                    if ($scanResult.NetworkStatus -ne "Normal") {
+                        $statusText += " [STATUS: $($scanResult.NetworkStatus)]"
                     }
                     Write-Host "  ✓ $currentIP - $statusText" -ForegroundColor Green
                 }                # Add to successful list
@@ -1152,7 +1146,7 @@ foreach ($entry in $ipRanges) {
                         'Ping Time (ms)' = $scanResult.PingTime
                         'Ports Open' = $scanResult.PortsOpen
                         'Service Status' = $scanResult.ServiceStatus
-                        'Filtering Detected' = $scanResult.FilteringDetected
+                        'Network Status' = $scanResult.NetworkStatus
                     }
                 }
                 

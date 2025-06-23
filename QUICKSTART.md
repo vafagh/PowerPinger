@@ -37,7 +37,7 @@ This will guide you through:
 .\powerPinger.ps1 -InputFile "sample_ips.csv" -OutputFile "my_results.csv"
 ```
 
-#### Smart Network Filtering Detection
+#### Network Accessibility Detection
 ```powershell
 .\powerPinger.ps1 -InputFile "sample_ips.csv" -ScanMode "smart" -Ports "80,443,22"
 ```
@@ -56,7 +56,7 @@ IP,Location,Ping Time (ms)
 1.1.1.1,"US,CA,San Francisco,94107",12
 ```
 
-### Smart Mode (Network Filtering Detection)
+### Both Mode (Network Accessibility Detection)
 ```csv
 IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detected
 8.8.8.8,"US,CA,Mountain View,94043",Success,15,"80,443",Accessible,No
@@ -113,7 +113,7 @@ PowerPinger helps you **find accessible servers and services** in restricted net
 ### 👥 **Who Should Use This**
 - 🔬 **Network Researchers**: Analyzing connectivity patterns
 - 🛡️ **Security Professionals**: Understanding network topology
-- 🌍 **Digital Rights Advocates**: Documenting network restrictions
+- 🌍 **Network Monitoring Teams**: Documenting network restrictions
 - 🔧 **System Administrators**: Troubleshooting connectivity issues
 
 ### ⚠️ **Important Warning**
@@ -134,3 +134,30 @@ PowerPinger helps you **find accessible servers and services** in restricted net
 **By using this tool, you accept full responsibility for compliance and results.**
 
 Need more help? Check the full [README.md](README.md) or [open an issue](https://github.com/yourusername/PowerPinger/issues)!
+
+## 🤖 Automation Scenarios
+
+### **⏰ Daily Automated Scanning**
+```powershell
+# Set up automated daily scanning using Windows Task Scheduler
+$action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument '-File "C:\path\to\powerPinger.ps1"'
+$trigger = New-ScheduledTaskTrigger -Daily -At 9am
+Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "DailyNetworkScan"
+```
+
+### **🔄 Continuous Monitoring**
+```powershell
+# Scan every hour with timestamped output files
+while ($true) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+    .\powerPinger.ps1 -OutputFile "monitoring_$timestamp.csv"
+    Start-Sleep -Seconds 3600  # Wait 1 hour
+}
+```
+
+### **📧 Portable Deployment (Under 18KB)**
+```powershell
+# Only 2 files needed: powerPinger.ps1 + IP list
+# Zipped under 18KB - can be emailed!
+# Extract and run immediately on any Windows machine
+```

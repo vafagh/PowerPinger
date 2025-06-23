@@ -1,5 +1,7 @@
 # 🚀 ڕێنمایی خێرای PowerPinger
 
+<div dir="rtl">
+
 ## 📚 ڕێنوێنی بەڵگەنامەکان
 [🏠 ڕیدمی سەرەکی](README_KU.md) | [🔧 تایبەتمەندییە پێشکەوتووەکان](ENHANCED_FEATURES.md) | [📋 گۆڕانکارییەکان](CHANGELOG.md) | [🤝 بەشداریکردن](CONTRIBUTING.md)
 
@@ -30,9 +32,9 @@
 
 ### 2. پشکنینی زیرەک
 ```powershell
-.\powerPinger.ps1 -ScanMode "smart" -Ports "80,443"
+.\powerPinger.ps1 -ScanMode "both" -Ports "80,443"
 ```
-هەم ping و هەم پۆرتەکان پشکنین دەکات و فیلتەرکردن دەناسێتەوە.
+هەم ping و هەم پۆرتەکان پشکنین دەکات و دەستڕاگەیشتن دەناسێتەوە.
 
 ### 3. ئامادەکردنی داتا
 فایلێک دروست بکە بە ناوی `my_targets.csv`:
@@ -44,24 +46,24 @@ IP,Location,Region,City,PostalCode
 
 ### 4. پشکنینی ئامانجەکانت
 ```powershell
-.\powerPinger.ps1 -InputFile "my_targets.csv" -ScanMode "smart"
+.\powerPinger.ps1 -InputFile "my_targets.csv" -ScanMode "both"
 ```
 
 ## 📊 تێگەیشتن لە دەرئەنجامەکان
 
-### دۆخی "smart" 
+### دۆخی "both" 
 ```
 IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detected
 8.8.8.8,Google DNS,Success,15,53;443,Accessible,No
 ```
 
-### واتای فیلتەرکردن
+### واتای دەستڕاگەیشتن
 | دۆخ | مانا |
 |-----|------|
 | **No** | کێشە نییە - هەمووشت کار دەکات |
 | **ICMP-Blocked** | ping ڕێگری لێکراوە بەڵام خزمەتگوزارییەکان کار دەکەن |
 | **Service-Blocked** | ping کار دەکات بەڵام خزمەتگوزارییەکان ڕێگری لێکراون |
-| **Likely-Filtered** | ئەگەری فیلتەرکردن هەیە |
+| **Unassigned-Range** | ئەگەری سێرڤەری تەرخاننەکراو |
 
 ## 🔧 ڕێکخستنە خێراکان
 
@@ -88,7 +90,7 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 ## 💡 ئامۆژگاری
 
 - **بۆ تۆڕە هێواشەکان**: `-Timeout 5000` بەکاربهێنە
-- **بۆ پشکنینی زۆر**: دۆخی `smart` بەکاربهێنە  
+- **بۆ پشکنینی تەواو**: دۆخی `both` بەکاربهێنە  
 - **بۆ پۆرتی تایبەت**: لیستی پۆرتەکانت دیاری بکە
 - **بۆ ئەنجامی خێرا**: دۆخی `ping` بەکاربهێنە
 
@@ -96,7 +98,7 @@ IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Filtering Detec
 
 ### بۆ شیکردنەوەی تۆڕ
 ```powershell
-.\powerPinger.ps1 -ScanMode "smart" -Ports "80,443,22,53,8080"
+.\powerPinger.ps1 -ScanMode "both" -Ports "80,443,22,53,8080"
 ```
 
 ### بۆ پشکنینی ڕاژەکار
@@ -129,4 +131,33 @@ PowerPinger یارمەتیت دەدات **سێرڤەر و خزمەتگوزاری
 ### ⚠️ **ئاگاداری گرنگ**
 **چالاکی تۆڕەکەت دەتوانرێت چاودێری بکرێت!** بەڕێوەبەرانی تۆڕ، ISP، و لایەنەکانی تر ڕەنگە چالاکی پشکنینی ئەم ئامرازە ببینن و تۆمار بکەن. تەنها لەسەر ئەو تۆڕانە بەکاری بهێنە کە مۆڵەتت هەیە بۆ تاقیکردنەوەیان، و دڵنیابەرەوە لە گونجان لەگەڵ یاسا ناوخۆیی و سیاسەتەکاندا.
 
+## 🤖 سیناریۆکانی خۆکارکردن
+
+### **⏰ پشکنینی خۆکاری ڕۆژانە**
+```powershell
+# ڕێکخستنی پشکنینی خۆکار لە Windows Task Scheduler
+$action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument '-File "C:\path\to\powerPinger.ps1"'
+$trigger = New-ScheduledTaskTrigger -Daily -At 9am
+Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "DailyNetworkScan"
+```
+
+### **🔄 چاودێری بەردەوام**
+```powershell
+# پشکنین هەر کاتژمێر لەگەڵ پاشەکەوتی ئەنجامەکان لەگەڵ نیشاندەری کات
+while ($true) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+    .\powerPinger.ps1 -OutputFile "monitoring_$timestamp.csv"
+    Start-Sleep -Seconds 3600  # چاوەڕوانی 1 کاتژمێر
+}
+```
+
+### **📧 بەڕێکردنی گواستراوە (کەمتر لە 18KB)**
+```powershell
+# تەنها 2 فایل پێویستە: powerPinger.ps1 + لیستی IP
+# زیپ کراو کەمتر لە 18KB - دەتوانرێت ئیمەیڵ بکرێت!
+# دەریهێنان و ڕاکردنی یەکسەر لەسەر هەر ماشینێکی Windows
+```
+
 ---
+
+</div>
