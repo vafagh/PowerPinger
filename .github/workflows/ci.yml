@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:  test-powershell:
+jobs:
+  test-powershell:
     runs-on: windows-latest
     
     steps:
