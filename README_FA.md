@@ -86,7 +86,10 @@ PowerPinger به شما کمک می‌کند **سرورها و خدمات این
 # اجازه اجرای اسکریپت (تنظیم یک‌بار)
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# اجرای اسکنر
+# اجرای اسکنر - روش ۱: کلیک راست
+# روی powerPinger.ps1 کلیک راست کنید → "Run with PowerShell" را انتخاب کنید
+
+# اجرای اسکنر - روش ۲: خط فرمان
 .\powerPinger.ps1
 ```
 

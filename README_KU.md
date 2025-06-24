@@ -86,7 +86,10 @@ PowerPinger یارمەتیت دەدات **سێرڤەر و خزمەتگوزاری
 # ڕێگەدان بە جێبەجێکردنی سکریپت (یەک جار ڕێکخستن)
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# ڕاکردنی سکەنەر
+# ڕاکردنی سکەنەر - ڕێگای ١: کلیکی ڕاست
+# کلیکی ڕاست لەسەر powerPinger.ps1 بکە → "Run with PowerShell" هەڵبژێرە
+
+# ڕاکردنی سکەنەر - ڕێگای ٢: هێڵی فەرمان
 .\powerPinger.ps1
 ```
 

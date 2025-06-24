@@ -22,7 +22,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ### 2. First Run (Interactive)
 ```powershell
-# Run with interactive setup
+# Method 1: Right-click on powerPinger.ps1 → Select "Run with PowerShell"
+
+# Method 2: Run from command line
 .\powerPinger.ps1
 ```
 This will guide you through:
@@ -39,7 +41,7 @@ This will guide you through:
 
 #### Network Accessibility Detection
 ```powershell
-.\powerPinger.ps1 -InputFile "sample_ips.csv" -ScanMode "smart" -Ports "80,443,22"
+.\powerPinger.ps1 -InputFile "sample_ips.csv" -ScanMode "both" -Ports "80,443,22"
 ```
 
 #### Fast Port Scanning (Bypass Ping Blocks)

@@ -1,4 +1,4 @@
-# 🎯 PowerPinger - Network Accessibility S- 🔍 **Serv- 🔧 - - �‍- - � **Ultra Portable**: Tool + IP lists = less than 18KB when zipped (can be emailed!)💾 **Zero Installation**: Uses only what comes with Windows 10/11 **Anyone in restricted networks**: Finding working internet connections🖥️ **Network professionals**: Analyzing connectivity and restrictions*Network troubleshooting**: Understanding connectivity problemsce detection**: Find which ports/services work on each IPanner
+# 🎯 PowerPinger - Network Accessibility Scanner
 
 ## 🌍 Languages
 [کوردی](README_KU.md) | [فارسی](README_FA.md) | [**English**](README.md)
@@ -22,17 +22,6 @@ PowerPinger helps you **find accessible servers and internet services** when you
 - 🛡️ **Network analysis**: Understand what servers are reachable
 - 📊 **Detailed reports**: Get CSV files with all connectivity information
 
-##  What, When, and Who
-
-### 🤔 **What Does This Tool Do?**
-PowerPinger helps you **find accessible servers and internet services** when your normal internet access is restricted or limited. It scans IP addresses to discover which ones you can still reach and what services are available.
-
-**What You Get:**
-- 📋 **List of accessible IPs**: Discover servers you can connect to
-- � **Service detection**: Find which ports/services work on each IP
-- 🛡️ **Network analysis**: Understand what network limitations exist
-- 📊 **Detailed reports**: Get CSV files with all connectivity information
-
 ### ⏰ **When Should You Use This?**
 Perfect for situations where your internet access is heavily restricted:
 
@@ -40,20 +29,20 @@ Perfect for situations where your internet access is heavily restricted:
 - 🔒 **VPN/Proxy blocked**: Can't use normal bypass tools
 - 🛡️ **Behind firewalls**: Need to find what connections still work
 - 📡 **Emergency connectivity**: Need alternative routes to internet services
-- � **Network troubleshooting**: Understanding connectivity problems
+- 🔧 **Network troubleshooting**: Understanding connectivity problems
 
 ### 👥 **Who Is This For?**
 - 🔬 **Researchers**: Studying internet restrictions and accessibility
 - 🌍 **Network monitoring teams**: Documenting network limitations
-- �️ **Network professionals**: Analyzing connectivity and restrictions
+- 🖥️ **Network professionals**: Analyzing connectivity and restrictions
 - 🔧 **System administrators**: Troubleshooting network access
-- �‍💻 **Anyone in restricted networks**: Finding working internet connections
+- 👨‍💻 **Anyone in restricted networks**: Finding working internet connections
 
-### � **Why This Tool?**
+### 🤔 **Why This Tool?**
 **PowerPinger is NOT the best network scanner available** - but it has unique advantages:
 
-- � **Zero Installation**: Uses only what comes with Windows 10/11
-- � **Ultra Portable**: Tool + IP lists = less than 18KB when zipped (can be emailed!)
+- 💾 **Zero Installation**: Uses only what comes with Windows 10/11
+- 📦 **Ultra Portable**: Tool + IP lists = less than 18KB when zipped (can be emailed!)
 - 🔓 **Works When Others Don't**: No need for admin rights or special software
 - 🎯 **Purpose-Built**: Specifically designed for restricted network environments
 - ⚡ **Instant Ready**: Extract and run immediately on any Windows computer
@@ -90,176 +79,223 @@ Perfect for situations where your internet access is heavily restricted:
    - Code repository access
    - Any available file transfer method
 
-3. **Run immediately** (no installation required):
+3. **Run immediately** (no installation needed):
 ```powershell
 # Allow script execution (one-time setup)
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# Run the scanner
+# Run the scanner - Method 1: Right-click
+# Right-click on powerPinger.ps1 → Select "Run with PowerShell"
+
+# Run the scanner - Method 2: Command line
 .\powerPinger.ps1
 ```
 
 ### **🌐 Full Repository Installation**
 
-1. **Clone the repository:**
+1. **Clone repository:**
 ```bash
 git clone https://github.com/vafagh/PowerPinger.git
 cd PowerPinger
 ```
 
-2. **Ensure PowerShell execution policy allows scripts:**
+2. **Ensure PowerShell execution policy:**
 ```powershell
-## 🚀 How to Use
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
-### **Requirements**
-- Windows 10/11 (any edition)
-- No additional software needed!
+## 🎯 Usage Scenarios & Automation
 
-### **Quick Start**
-1. **Download** - Extract the tool files to any folder
-2. **Double-click** `powerPinger.ps1` or run from command line
-3. **Follow prompts** - Interactive setup will guide you
-
-### **Simple Usage Scenarios**
-
-#### 📞 **Scenario 1: "Can I reach any servers?"**
+### **📧 Email/USB Deployment (< 18KB)**
 ```powershell
-# Just run it - uses default IP list
+# Essential files: powerPinger.ps1 + ip_list.csv
+# Zipped: < 18KB - can be emailed!
+# Extract and run immediately on any Windows machine
+```
+
+### **⏰ Task Scheduler Automation**
+```powershell
+# Create scheduled task for regular scanning
+$action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument '-File "C:\path\to\powerPinger.ps1"'
+$trigger = New-ScheduledTaskTrigger -Daily -At 9am
+Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "NetworkScan"
+```
+
+### **🔄 Automated Scanning with Intervals**
+```powershell
+# Scan every hour with timestamped output
+while ($true) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+    .\powerPinger.ps1 -OutputFile "scan_$timestamp.csv"
+    Start-Sleep -Seconds 3600  # 1 hour delay
+}
+```
+
+### **🎮 Interactive Usage**
+```powershell
+# Quick scan with defaults
 .\powerPinger.ps1
+
+# Advanced scan with custom options
+.\powerPinger.ps1 -ScanMode "both" -Ports "80,443,22,53" -MaxResponses 10
 ```
-**Result**: Shows which of the pre-loaded IPs you can reach
-
-#### 🔍 **Scenario 2: "What services work on this IP?"**
-```powershell
-# Check specific IPs for web services
-.\powerPinger.ps1 -InputFile "my_targets.csv" -ScanMode "comprehensive" -Ports "80,443"
-```
-**Result**: Shows ping + web port accessibility for each IP
-
-#### 🚫 **Scenario 3: "Ping is blocked, try ports only"**
-```powershell
-# Skip ping, test services directly
-.\powerPinger.ps1 -ScanMode "port" -Ports "80,443,22,53"
-```
-**Result**: Bypasses ping restrictions, checks TCP connections
-
-#### ⚡ **Scenario 4: "Quick scan, don't test everything"**
-```powershell
-# Stop after finding 3 working IPs per range
-.\powerPinger.ps1 -MaxResponses 3 -ScanMode "comprehensive"
-```
-**Result**: Faster scanning, good for network discovery
-
-#### 🤖 **Scenario 5: "Run automatically every hour"**
-```powershell
-# Windows Task Scheduler or script automation
-.\powerPinger.ps1 -InputFile "targets.csv" -OutputFile "hourly_scan.csv" -ScanMode "port"
-```
-**Result**: Automated monitoring, no user interaction needed
-
-#### 📧 **Scenario 6: "Email-friendly deployment"**
-1. **Zip the folder** (becomes <18KB)
-2. **Email to target location**
-3. **Extract and run** - no installation needed
-
-### **Input Files Made Simple**
-
-**Create a CSV file** with IPs you want to test:
-```csv
-IP,Description
-8.8.8.8,Google DNS
-1.1.1.1,Cloudflare DNS
-192.168.1.0/24,Local network range
-```
-
-**Or just list IPs** in a text file:
-```
-8.8.8.8
-1.1.1.1
-192.168.1.0/24
-```
-
-## 🎛️ Scan Modes Explained
-
-| Mode | What it does | When to use |
-|------|-------------|-------------|
-| **`ping`** | Only tests ping | When you just need basic connectivity |
-| **`port`** | Only tests TCP ports | When ping is blocked by firewall |
-| **`both`** | Tests ping + ports separately | When you want complete information |
-| **`both`** | Analyzes accessibility patterns | When you want to understand what's reachable |
-
-## 📊 Understanding Results
-
-Your results CSV will show:
-- **Ping Result**: Success/Failed/Timeout
-- **Ping Time**: Response time in milliseconds  
-- **Ports Open**: Which TCP ports responded
-- **Service Status**: Overall accessibility assessment
-- **Network Status**: Type of accessibility found
-
-**Network Status Types:**
-- **No**: Everything works normally
-- **ICMP-Blocked**: Ping fails but services work
-- **Service-Blocked**: Ping works but services fail
-- **Unassigned-Range**: No response (likely no server assigned)
-
-## 🔧 Advanced Configuration
-
-**Timeouts** (if network is slow):
-```powershell
-.\powerPinger.ps1 -Timeout 5000 -PortTimeout 10000
-```
-
-**Custom ports** (test specific services):
-```powershell
-.\powerPinger.ps1 -Ports "80,443,22,53,8080,3389"
-```
-
-**Skip dead ranges** (for large scans):
-```powershell
-.\powerPinger.ps1 -Jump 10 -MaxFailures 5
-```
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch  
-3. Submit a pull request
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Important Disclaimers
-
-### **⚖️ Legal Warning**
-- **Only scan networks you own** or have explicit permission to test
-- **Check local laws** - network scanning may be restricted in your area
-- **Get authorization** before scanning corporate or third-party networks
-- **You are responsible** for compliance with all laws and policies
-
-### **🛠️ Technical Limitations**
-- **Not thoroughly tested** in all network environments
-- **May contain bugs** that affect results accuracy
-- **Results may vary** based on network conditions
-- **No guarantees** about performance or accuracy
-
-### **🚫 No Warranties**
-- Provided **"as is"** without any warranties
-- **No liability** for damages or consequences from use
-- **Use at your own risk** and test in safe environments first
-
-**By using PowerPinger, you acknowledge these terms and accept all responsibility.**
 
 ---
 
-**⭐ If this tool helps you, please star the repository!**
+## 🌟 Key Features
 
-## 📚 More Information
-- 📖 [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
-- 🚀 [Enhanced Features](docs/ENHANCED_FEATURES.md) - Advanced capabilities overview
-- 📋 [Changelog](docs/CHANGELOG.md) - Version history and updates
-- 🤝 [Contributing](docs/CONTRIBUTING.md) - Development guidelines
-- 🎯 [MaxResponses Feature](docs/MAXRESPONSES_FEATURE.md) - Response limiting documentation
+- 🛡️ **Network accessibility detection**: Advanced analysis to identify different types of access and available servers
+- 🚀 **Zero dependencies**: No additional software needed - just PowerShell
+- ⚡ **Fast and efficient**: ~1000 lines of code + IP list = complete network analysis suite
+- 🎯 **Multiple scan modes**: ping/port/both/parallel
+- 📊 **Detailed reporting**: Results in CSV format
 
-[⬆️ Back to top](#-powerpinger---network-accessibility-scanner)
+## 🚀 Quick Start
+
+### Prerequisites
+- Windows 10 or later
+- PowerShell 5.1+ (pre-installed by default)
+
+### 1. Download
+```bash
+git clone https://github.com/vafagh/PowerPinger.git
+cd PowerPinger
+```
+
+### 2. First Scan
+```powershell
+# Simple scan
+.\powerPinger.ps1
+
+# Comprehensive accessibility detection
+.\powerPinger.ps1 -ScanMode "both" -Ports "80,443,22,53"
+```
+
+## 📋 Scan Modes
+
+- **`ping`** - ICMP ping only
+- **`port`** - Port scanning only  
+- **`both`** - Ping first, then port scan non-responders (optimized)
+- **`parallel`** - Fast parallel ping with batch processing
+
+## 🛡️ Network Accessibility Detection
+
+This tool can identify these types of access patterns:
+
+### ICMP Blocking
+- **Symptoms**: Services work but ping doesn't
+- **Common in**: Corporate networks, restricted environments
+
+### Service Blocking  
+- **Symptoms**: Ping works but services don't
+- **Common in**: Advanced configurations, security monitoring
+
+### Normal Access
+- **Symptoms**: Both ping and services work
+
+## 📁 Input File Format
+
+### CSV for Individual IPs
+```csv
+IP,Location,Region,City,PostalCode
+8.8.8.8,Google DNS,US,Mountain View,94035
+1.1.1.1,Cloudflare DNS,US,San Francisco,94107
+```
+
+### TXT for Ranges
+```
+192.168.1.0/24
+10.0.0.0/16
+172.16.0.0/12
+```
+
+## 🔧 Configuration
+
+```powershell
+# Timeouts
+.\powerPinger.ps1 -Timeout 2000 -PortTimeout 5000
+
+# Specific ports
+.\powerPinger.ps1 -Ports "80,443,8080,8443"
+
+# Jump mode after failures
+.\powerPinger.ps1 -MaxFailures 3 -Jump 5
+
+# Limit responses per range
+.\powerPinger.ps1 -MaxResponses 5
+```
+
+## 📊 Sample Output
+
+```csv
+IP,Location,Ping Result,Ping Time (ms),Ports Open,Service Status,Network Status
+8.8.8.8,Google DNS,Success,15,53;443,Accessible,Normal
+1.1.1.1,Cloudflare DNS,Success,12,53;443,Accessible,Normal
+```
+
+## 🔍 Network Status Types
+
+| Status | Description |
+|--------|-------------|
+| **Normal** | Both ping and ports work |
+| **ICMP-Blocked** | Services work, ping doesn't |
+| **Service-Blocked** | Ping works, services are refused |
+| **Unassigned-Range** | No response, likely no assigned server |
+
+## 💡 Tips
+
+### For Restricted Networks
+- Copy only the powerPinger.ps1 file
+- No installation required
+- Run from USB or network
+
+### For Performance Analysis
+- Use "both" mode
+- Increase timeouts for slow networks
+- Enable Jump mode for large ranges
+
+## 🤝 Contributing
+
+To contribute to this project development:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## ⚠️ Important Disclaimers and Risks
+
+### **⚖️ Legal and Compliance**
+- **Use only on authorized networks**: Only use this tool on networks you own or have explicit written permission to test
+- **Local laws**: Using network scanning tools may violate local laws and regulations
+- **Organizational policies**: Check your organization's IT policies before use
+- **Your responsibility**: You are fully responsible for legal compliance
+
+### **🛠️ Technical Limitations**
+- **Incomplete testing**: This tool has not been thoroughly tested under all conditions
+- **Potential errors**: Software may contain bugs that affect results
+- **Result accuracy**: Ping and connection results may not be accurate
+- **Environmental changes**: Results vary based on network changes
+
+### **🚫 No Warranties**
+- **"As is"**: This software is provided without any warranties
+- **No liability**: Author accepts no responsibility for any damages
+- **Result accuracy**: No guarantee of result correctness
+
+### **⚠️ Use at Your Own Risk**
+- **Personal responsibility**: You accept all risks
+- **Expert consultation**: Consult with experts
+- **Testing**: Test before official use
+
+**By using PowerPinger, you acknowledge that you have read and understood these terms.**
+
+## 🔗 Useful Links
+
+- [Full Documentation](docs/QUICKSTART.md)
+- [Enhanced Features](docs/ENHANCED_FEATURES.md)
+- [Changelog](docs/CHANGELOG.md)
+
+## 📄 License
+
+This project is released under the MIT License. See [LICENSE](docs/LICENSE) for more information.
