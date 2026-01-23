@@ -12,6 +12,63 @@
 
 All notable changes to PowerPinger will be documented in this file.
 
+## [2.2.0] - 2026-01-22
+
+### Added
+
+- **Minifier Tool**: New `Minifier.ps1` script for reducing file size
+  - Removes comments and blank lines (~23% size reduction)
+  - Renames variables while preserving parameters and built-ins
+  - Creates minified script and ZIP archive (~85% compression)
+  - Preserves all script functionality
+  - Intelligent function parameter preservation
+
+- **Full IPv6 Support**: Complete IPv6 scanning capabilities
+  - IPv6 address parsing and validation
+  - Intelligent range limiting (max 65,536 addresses per range)
+  - IPv6 CIDR notation support (e.g., 2001:db8::/32)
+  - Automatic /128 subnet for single IPv6 addresses
+  - IPv6-aware ping functionality
+
+- **Network Pre-flight Checks**: Comprehensive connectivity validation
+  - IPv4 gateway ping testing
+  - IPv6 gateway ping testing
+  - DNS resolution verification
+  - External connectivity tests (Cloudflare, DCI DNS)
+  - Detailed connectivity reporting
+  - Interactive troubleshooting options
+
+- **Live Range Skip**: Real-time scan control
+  - Press 'S' key during scanning to skip current range
+  - Visual feedback and confirmation
+  - Available in all scan modes
+
+### Enhanced
+
+- **README Documentation**: Simplified and consolidated
+  - Removed repetitive content
+  - Clearer quick start instructions
+  - Concise parameter tables
+  - Better organized sections
+  - Consistent formatting across English, Persian, and Kurdish versions
+
+- **Network Status Detection**: 
+  - Identifies IPv4/IPv6 availability before scanning
+  - Skips incompatible ranges with clear messages
+  - Shows network status in scan summary
+
+- **Error Handling**: Improved validation and user feedback
+  - Better IP format detection
+  - Clear error messages for invalid ranges
+  - Graceful handling of connectivity issues
+
+### Fixed
+
+- **Minifier String Handling**: Fixed comment removal breaking strings
+  - Properly handles single quotes in strings (e.g., `'S'`)
+  - Preserves escaped characters
+  - Respects string context for hash symbols
+
 ## [2.1.0] - 2025-06-22
 
 ### Added
