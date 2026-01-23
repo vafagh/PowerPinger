@@ -52,7 +52,12 @@ param (
     [int]$Jump = 16,  # Number of IPs to skip after MaxFailures (0 = disabled)
     
     [Parameter()]
-    [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)    [Parameter()]
+    [int]$Skip = 3, # Number of jumps before skipping entire range (only applies if Jump > 0)
+    
+    [Parameter()]
+    [int]$DelayMs = 0, # Delay in milliseconds between batches (rate limiting, 0 = disabled)
+    
+    [Parameter()]
     [string]$ScanMode = "ping", # Scanning mode: "ping", "port", "both", "parallel"
     
     [Parameter()]
@@ -242,11 +247,20 @@ function Show-ProgramCapabilities {
     Write-Host "   • Adaptive timeout detection" -ForegroundColor White
     Write-Host "   • Jump mode: Skip unresponsive IP blocks" -ForegroundColor White
     Write-Host "   • Range skipping: Avoid scanning dead ranges" -ForegroundColor White
+    Write-Host "   • Live control: Press 'S' during scan to skip current range" -ForegroundColor White
     Write-Host "   • Port scanning: Test service accessibility" -ForegroundColor White
     Write-Host "   • Network accessibility detection: Identify access patterns" -ForegroundColor White
     Write-Host "   • Multiple scan modes: ping/port/both" -ForegroundColor White
     Write-Host "   • PowerShell 5.1 & 6+ compatibility" -ForegroundColor White
-    Write-Host "   • IPv6 range detection (auto-skip)" -ForegroundColor White
+    Write-Host "   • Full IPv6 support with intelligent range limiting" -ForegroundColor White
+    Write-Host "   • Rate limiting: Prevent DDoS detection with batch delays" -ForegroundColor White
+    Write-Host ""
+    
+    Write-Host "⚠️  Safety Warning:" -ForegroundColor Yellow
+    Write-Host "   • Scanning large production networks (Cloudflare, AWS, etc.) may trigger" -ForegroundColor Red
+    Write-Host "     DDoS protection and block your IP or internet access" -ForegroundColor Red
+    Write-Host "   • Use rate limiting (-DelayMs 100-500) for production infrastructure" -ForegroundColor Yellow
+    Write-Host "   • Test with small ranges first before scanning large networks" -ForegroundColor Yellow
     Write-Host ""
     
     Write-Host "📊 Output Features:" -ForegroundColor Cyan
@@ -361,14 +375,37 @@ function Get-InputFile {
     $allFiles = @($csvFiles) + @($txtFiles) | Sort-Object Name
     
     if ($allFiles.Count -eq 0) {
-        Write-Host "❌ ERROR: No CSV or TXT files found in the script directory!" -ForegroundColor Red
-        Write-Host "📁 Please place your IP range file in: $scriptDirectory" -ForegroundColor Yellow
+        Write-Host "📋 No CSV or TXT files found in the script directory" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "📋 Expected file format:" -ForegroundColor Cyan
-        Write-Host "   Line 1: 192.168.1.0/24,US,CA,City,12345" -ForegroundColor White
-        Write-Host "   Line 2: 8.8.8.8,US,CA,Google,12345" -ForegroundColor White
-        Write-Host "   Line 3: 10.0.0.0/16,US,NY,Private,00000" -ForegroundColor White
-        exit 1
+        Write-Host "❓ Would you like to:" -ForegroundColor Cyan
+        Write-Host "[1] Enter IP addresses manually (recommended for quick tests)" -ForegroundColor Green
+        Write-Host "[2] Create a new input file and exit" -ForegroundColor Yellow
+        Write-Host "[0] Exit" -ForegroundColor Red
+        Write-Host ""
+        
+        $choice = Read-Host "👉 Select option (0-2)"
+        
+        if ($choice -eq "1") {
+            return "MANUAL_INPUT"
+        } elseif ($choice -eq "2") {
+            Write-Host ""
+            Write-Host "📝 Creating sample template file: ip_list.csv" -ForegroundColor Cyan
+            $sampleContent = @"
+# Sample IP ranges - Edit this file with your own ranges
+# Format: IP/CIDR,Country,Region,City,PostalCode
+8.8.8.8,US,CA,Mountain View,94043
+1.1.1.1,US,CA,San Francisco,94107
+192.168.1.0/24,Local,Network,LAN,00000
+"@
+            $samplePath = Join-Path -Path $scriptDirectory -ChildPath "ip_list.csv"
+            $sampleContent | Out-File -FilePath $samplePath -Encoding UTF8
+            Write-Host "✅ Sample file created: $samplePath" -ForegroundColor Green
+            Write-Host "📝 Edit this file and run the script again" -ForegroundColor Yellow
+            exit 0
+        } else {
+            Write-Host "👋 Exiting..." -ForegroundColor Yellow
+            exit 0
+        }
     }
     
     # If only one file exists, use it automatically
@@ -382,7 +419,15 @@ function Get-InputFile {
     # Multiple files found - show menu
     do {
         Write-Host ""
-        Show-FileMenu -Files $allFiles -Title "📂 Available IP Range Files"
+        Write-Host "📂 Available IP Range Files" -ForegroundColor Yellow
+        Write-Host "============================" -ForegroundColor Yellow
+        
+        for ($i = 0; $i -lt $allFiles.Count; $i++) {
+            Write-Host "[$($i + 1)] $($allFiles[$i].Name)" -ForegroundColor Cyan
+        }
+        Write-Host "[0] Exit" -ForegroundColor Red
+        Write-Host ""
+        
         Write-Host "❓ Which file contains your IP ranges to scan?" -ForegroundColor Yellow
         Write-Host "💡 Tip: Files should contain IP addresses or CIDR ranges" -ForegroundColor Gray
         $selection = Read-Host "👉 Select input file (1-$($allFiles.Count)) or press Enter for default ($DefaultInputFile)"
@@ -585,6 +630,17 @@ function Get-ScanConfiguration {
             $script:MaxResponses = [int]$maxResponsesInput
         }
         
+        # Rate Limiting configuration
+        Write-Host ""
+        Write-Host "⏱️  Rate Limiting (current: ${script:DelayMs}ms)" -ForegroundColor Yellow
+        Write-Host "💡 Delay between batches to prevent DDoS detection (parallel mode)" -ForegroundColor Gray
+        Write-Host "⚠️  IMPORTANT: Use 100-500ms for production networks (Cloudflare, AWS, etc.)" -ForegroundColor Red
+        Write-Host "📋 Values: 0 (no delay, risky), 100 (safe), 250 (safer), 500 (safest)" -ForegroundColor Gray
+        $delayInput = Read-Host "👉 Enter delay in ms (0=disabled) or press Enter for default (${script:DelayMs})"
+        if (-not [string]::IsNullOrWhiteSpace($delayInput) -and $delayInput -match '^\d+$') {
+            $script:DelayMs = [int]$delayInput
+        }
+        
         Write-Host ""
         Write-Host "✅ Configuration Updated!" -ForegroundColor Green
     } else {
@@ -636,6 +692,13 @@ if ($InteractiveMode) {
         Write-Host "   Max Responses: $MaxResponses per range" -ForegroundColor White
     } else {
         Write-Host "   Max Responses: Disabled" -ForegroundColor White
+    }
+    if ($ScanMode -eq "parallel") {
+        if ($DelayMs -gt 0) {
+            Write-Host "   Rate Limiting: ${DelayMs}ms delay between batches" -ForegroundColor Green
+        } else {
+            Write-Host "   Rate Limiting: Disabled (⚠️ Risk of DDoS detection)" -ForegroundColor Red
+        }
     }
     Write-Host ""
     # Ask for final confirmation
@@ -702,7 +765,42 @@ if ($InteractiveMode) {
     Write-Host "⚡ Starting scan automatically..." -ForegroundColor Green
 }
 
-# Helper function to convert CIDR notation to IP range
+# Helper function to check for keyboard input without blocking
+function Test-SkipKeyPressed {
+    try {
+        if ([Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+            if ($key.Key -eq 'S') {
+                Write-Host ""
+                Write-Host "  🛑 SKIP KEY DETECTED - Stopping current range..." -ForegroundColor Yellow
+                Write-Host ""
+                return $true
+            }
+        }
+    } catch {
+        # Silently handle any console access errors
+    }
+    return $false
+}
+
+# Helper function to detect IP version
+function Get-IPVersion {
+    param ([string]$IPAddress)
+    
+    try {
+        $parsed = [System.Net.IPAddress]::Parse($IPAddress)
+        if ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
+            return 4
+        } elseif ($parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+            return 6
+        }
+        return 0
+    } catch {
+        return 0
+    }
+}
+
+# Helper function to convert CIDR notation to IP range (IPv4 and IPv6)
 function Get-IPRange {
     param (
         [string]$BaseIP,
@@ -710,23 +808,87 @@ function Get-IPRange {
     )
     
     try {
-        # Convert IP to its numeric representation
-        $ipAddress = [System.Net.IPAddress]::Parse($BaseIP)
-        $ipBytes = $ipAddress.GetAddressBytes()
-        if ([BitConverter]::IsLittleEndian) {
-            [Array]::Reverse($ipBytes)
-        }
-        $ipInt = [BitConverter]::ToUInt32($ipBytes, 0)
+        $ipVersion = Get-IPVersion -IPAddress $BaseIP
         
-        # Calculate subnet boundaries
-        $mask = [UInt32]([Math]::Pow(2, 32 - $CIDRSuffix) - 1)
-        $startIP = $ipInt -band (-bnot $mask)
-        $endIP = $startIP + $mask
-        
-        # Return start and end IPs
-        return @{
-            StartIP = $startIP
-            EndIP = $endIP
+        if ($ipVersion -eq 4) {
+            # IPv4 processing
+            $ipAddress = [System.Net.IPAddress]::Parse($BaseIP)
+            $ipBytes = $ipAddress.GetAddressBytes()
+            if ([BitConverter]::IsLittleEndian) {
+                [Array]::Reverse($ipBytes)
+            }
+            $ipInt = [BitConverter]::ToUInt32($ipBytes, 0)
+            
+            # Calculate subnet boundaries
+            $mask = [UInt32]([Math]::Pow(2, 32 - $CIDRSuffix) - 1)
+            $startIP = $ipInt -band (-bnot $mask)
+            $endIP = $startIP + $mask
+            
+            return @{
+                StartIP = $startIP
+                EndIP = $endIP
+                IPVersion = 4
+                TotalIPs = ($endIP - $startIP + 1)
+            }
+        } elseif ($ipVersion -eq 6) {
+            # IPv6 processing - return byte arrays instead of integers
+            $ipAddress = [System.Net.IPAddress]::Parse($BaseIP)
+            $ipBytes = $ipAddress.GetAddressBytes()
+            
+            # Calculate number of host bits
+            $hostBits = 128 - $CIDRSuffix
+            
+            # For IPv6, we can't enumerate all IPs in large ranges
+            # Calculate theoretical total (may be huge)
+            if ($hostBits -le 32) {
+                $totalIPs = [Math]::Pow(2, $hostBits)
+            } else {
+                $totalIPs = [double]::PositiveInfinity
+            }
+            
+            # Calculate network address (zero out host bits)
+            $networkBytes = [byte[]]::new(16)
+            [Array]::Copy($ipBytes, $networkBytes, 16)
+            
+            # Zero out host bits to get network address
+            $byteIndex = [Math]::Floor($CIDRSuffix / 8)
+            $bitIndex = $CIDRSuffix % 8
+            
+            if ($bitIndex -ne 0) {
+                $networkBytes[$byteIndex] = $networkBytes[$byteIndex] -band (0xFF -shl (8 - $bitIndex))
+                $byteIndex++
+            }
+            
+            for ($i = $byteIndex; $i -lt 16; $i++) {
+                $networkBytes[$i] = 0
+            }
+            
+            # Calculate broadcast/last address (set all host bits to 1)
+            $broadcastBytes = [byte[]]::new(16)
+            [Array]::Copy($networkBytes, $broadcastBytes, 16)
+            
+            $byteIndex = [Math]::Floor($CIDRSuffix / 8)
+            $bitIndex = $CIDRSuffix % 8
+            
+            if ($bitIndex -ne 0) {
+                $broadcastBytes[$byteIndex] = $broadcastBytes[$byteIndex] -bor (0xFF -shr $bitIndex)
+                $byteIndex++
+            }
+            
+            for ($i = $byteIndex; $i -lt 16; $i++) {
+                $broadcastBytes[$i] = 0xFF
+            }
+            
+            return @{
+                StartIP = $networkBytes
+                EndIP = $broadcastBytes
+                IPVersion = 6
+                TotalIPs = $totalIPs
+                HostBits = $hostBits
+            }
+        } else {
+            Write-Error "Invalid IP address format: $BaseIP"
+            return $null
         }
     } catch {
         Write-Error "Error calculating IP range for $BaseIP/$CIDRSuffix : $_"
@@ -734,22 +896,65 @@ function Get-IPRange {
     }
 }
 
-# Helper function to convert numeric IP to string format
+# Helper function to convert numeric IP to string format (IPv4 and IPv6)
 function ConvertTo-IPString {
     param (
-        [uint32]$IPInt
+        [Parameter(ParameterSetName='IPv4')]
+        [uint32]$IPInt,
+        
+        [Parameter(ParameterSetName='IPv6')]
+        [byte[]]$IPBytes
     )
     
     try {
-        $bytes = [BitConverter]::GetBytes($IPInt)
-        if ([BitConverter]::IsLittleEndian) {
-            [Array]::Reverse($bytes)
+        if ($PSCmdlet.ParameterSetName -eq 'IPv4') {
+            $bytes = [BitConverter]::GetBytes($IPInt)
+            if ([BitConverter]::IsLittleEndian) {
+                [Array]::Reverse($bytes)
+            }
+            return [System.Net.IPAddress]::new($bytes).ToString()
+        } else {
+            return [System.Net.IPAddress]::new($IPBytes).ToString()
         }
-        return [System.Net.IPAddress]::new($bytes).ToString()
     } catch {
-        Write-Error "Error converting numeric IP $IPInt to string: $_"
+        Write-Error "Error converting IP to string: $_"
         return $null
     }
+}
+
+# Helper function to increment IPv6 address bytes
+function Add-IPv6Address {
+    param (
+        [byte[]]$IPBytes,
+        [int]$Increment = 1
+    )
+    
+    $result = [byte[]]::new(16)
+    [Array]::Copy($IPBytes, $result, 16)
+    
+    # Add increment starting from the least significant byte
+    $carry = $Increment
+    for ($i = 15; $i -ge 0 -and $carry -gt 0; $i--) {
+        $sum = $result[$i] + $carry
+        $result[$i] = $sum -band 0xFF
+        $carry = $sum -shr 8
+    }
+    
+    return $result
+}
+
+# Helper function to compare IPv6 addresses
+function Compare-IPv6Address {
+    param (
+        [byte[]]$Address1,
+        [byte[]]$Address2
+    )
+    
+    for ($i = 0; $i -lt 16; $i++) {
+        if ($Address1[$i] -lt $Address2[$i]) { return -1 }
+        if ($Address1[$i] -gt $Address2[$i]) { return 1 }
+    }
+    return 0
 }
 
 # Helper function to convert CIDR to a list of IPs
@@ -808,20 +1013,45 @@ function Invoke-ParallelPing {
         # PowerShell Core - use ForEach-Object -Parallel
         $results = $IPList | ForEach-Object -Parallel {
             try {
-                $ping = Test-Connection -ComputerName $_ -Count 1 -TimeoutSeconds ($using:TimeoutMs / 1000) -ErrorAction SilentlyContinue
-                if ($ping) {
-                    [PSCustomObject]@{
-                        IP = $_
-                        Success = $true
-                        ResponseTime = $ping.ResponseTime
-                        Status = "Success"
+                # Detect if IPv6 address
+                $isIPv6 = $_ -match ':'
+                
+                if ($isIPv6) {
+                    # Use .NET Ping for IPv6 (Test-Connection has issues with IPv6)
+                    $ping = New-Object System.Net.NetworkInformation.Ping
+                    $pingReply = $ping.Send($_, $using:TimeoutMs)
+                    if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+                        [PSCustomObject]@{
+                            IP = $_
+                            Success = $true
+                            ResponseTime = $pingReply.RoundtripTime
+                            Status = "Success"
+                        }
+                    } else {
+                        [PSCustomObject]@{
+                            IP = $_
+                            Success = $false
+                            ResponseTime = 0
+                            Status = $pingReply.Status.ToString()
+                        }
                     }
                 } else {
-                    [PSCustomObject]@{
-                        IP = $_
-                        Success = $false
-                        ResponseTime = 0
-                        Status = "Timeout"
+                    # IPv4 - use Test-Connection
+                    $ping = Test-Connection -ComputerName $_ -Count 1 -TimeoutSeconds ($using:TimeoutMs / 1000) -ErrorAction SilentlyContinue
+                    if ($ping) {
+                        [PSCustomObject]@{
+                            IP = $_
+                            Success = $true
+                            ResponseTime = $ping.ResponseTime
+                            Status = "Success"
+                        }
+                    } else {
+                        [PSCustomObject]@{
+                            IP = $_
+                            Success = $false
+                            ResponseTime = 0
+                            Status = "Timeout"
+                        }
                     }
                 }
             } catch {
@@ -829,7 +1059,7 @@ function Invoke-ParallelPing {
                     IP = $_
                     Success = $false
                     ResponseTime = 0
-                    Status = "Error"
+                    Status = "Error: $($_.Exception.Message)"
                 }
             }
         } -ThrottleLimit $MaxConcurrent
@@ -846,7 +1076,7 @@ function Invoke-ParallelPing {
                 try {
                     $ping = New-Object System.Net.NetworkInformation.Ping
                     $pingReply = $ping.Send($IPAddress, $Timeout)
-                    if ($pingReply.Status -eq "Success") {
+                    if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
                         [PSCustomObject]@{
                             IP = $IPAddress
                             Success = $true
@@ -916,6 +1146,7 @@ function Invoke-BatchParallelPing {
         [int]$TimeoutMs = 1500,
         [int]$BatchSize = 256,
         [int]$JumpSize = 1024,
+        [int]$DelayMs = 0,
         [string]$LocationData,
         [string]$OutputPath
     )
@@ -925,9 +1156,19 @@ function Invoke-BatchParallelPing {
     $successfulIPs = @()
     $batchNumber = 0
     
-    Write-Host "  Starting parallel ping scan with $BatchSize IPs per batch" -ForegroundColor Yellow
+    if ($DelayMs -gt 0) {
+        Write-Host "  Starting parallel ping scan with $BatchSize IPs per batch (${DelayMs}ms delay between batches)" -ForegroundColor Yellow
+    } else {
+        Write-Host "  Starting parallel ping scan with $BatchSize IPs per batch" -ForegroundColor Yellow
+    }
     
     while ($currentPos -le $EndIP) {
+        # Check for skip key press
+        if (Test-SkipKeyPressed) {
+            Write-Host "    ⏭️  Skip key pressed - stopping parallel scan" -ForegroundColor Yellow
+            break
+        }
+        
         $batchNumber++
         $batchEnd = [Math]::Min($currentPos + $BatchSize - 1, $EndIP)
         $batchIPs = @()
@@ -949,6 +1190,12 @@ function Invoke-BatchParallelPing {
         
         # Perform parallel ping on batch
         $results = Invoke-ParallelPing -IPList $batchIPs -TimeoutMs $TimeoutMs -MaxConcurrent 50
+        
+        # Check for skip key after batch completes
+        if (Test-SkipKeyPressed) {
+            Write-Host "    ⏭️  Skip key pressed - stopping parallel scan" -ForegroundColor Yellow
+            break
+        }
         
         # Process results
         $batchSuccessful = $results | Where-Object { $_.Success }
@@ -980,6 +1227,11 @@ function Invoke-BatchParallelPing {
                 $currentPos = $batchEnd + 1 + $JumpSize
                 continue
             }
+        }
+        
+        # Rate limiting: delay before next batch
+        if ($DelayMs -gt 0 -and $currentPos -le $EndIP) {
+            Start-Sleep -Milliseconds $DelayMs
         }
         
         # Move to next batch
@@ -1065,6 +1317,544 @@ function Test-PortScan {
     }
 }
 
+# Function to check network connectivity before scanning
+function Test-NetworkConnectivity {
+    param(
+        [bool]$Interactive = $true
+    )
+    
+    $connectivityReport = [PSCustomObject]@{
+        IPv4Ready = $false
+        IPv6Ready = $false
+        IPv4Address = $null
+        IPv6Address = $null
+        IPv4Gateway = $null
+        IPv6Gateway = $null
+        CanScanIPv4 = $false
+        CanScanIPv6 = $false
+        Issues = @()
+    }
+    
+    Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║       NETWORK CONNECTIVITY PRE-FLIGHT CHECK                    ║" -ForegroundColor Cyan
+    Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Check IPv4 Configuration
+    Write-Host "[1/6] Checking IPv4 Configuration..." -ForegroundColor Yellow
+    $ipv4Adapters = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { 
+        $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" 
+    }
+    
+    if ($ipv4Adapters) {
+        $ipv4Primary = $ipv4Adapters | Select-Object -First 1
+        $connectivityReport.IPv4Address = $ipv4Primary.IPAddress
+        Write-Host "  ✓ IPv4 Address Found: $($ipv4Primary.IPAddress)" -ForegroundColor Green
+        
+        # Get IPv4 Gateway
+        $ipv4Route = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($ipv4Route) {
+            $connectivityReport.IPv4Gateway = $ipv4Route.NextHop
+            Write-Host "  ✓ IPv4 Gateway: $($ipv4Route.NextHop)" -ForegroundColor Green
+            
+            # Test gateway ping
+            Write-Host "  → Testing IPv4 gateway connectivity..." -ForegroundColor Gray
+            $gwPing = Invoke-QuickPing -IP $ipv4Route.NextHop -TimeoutMs 2000
+            if ($gwPing.Success) {
+                Write-Host "  ✓ IPv4 Gateway Ping: Success ($($gwPing.ResponseTime)ms)" -ForegroundColor Green
+                $connectivityReport.IPv4Ready = $true
+            } else {
+                Write-Host "  ✗ IPv4 Gateway Ping: Failed ($($gwPing.Status))" -ForegroundColor Red
+                $connectivityReport.Issues += "IPv4 gateway not responding"
+            }
+        } else {
+            Write-Host "  ✗ No IPv4 Gateway Found" -ForegroundColor Red
+            $connectivityReport.Issues += "No IPv4 default gateway configured"
+        }
+    } else {
+        Write-Host "  ✗ No IPv4 Address Assigned" -ForegroundColor Red
+        $connectivityReport.Issues += "No IPv4 address assigned to network adapter"
+    }
+    
+    # Check IPv6 Configuration
+    Write-Host "`n[2/6] Checking IPv6 Configuration..." -ForegroundColor Yellow
+    $ipv6Adapters = Get-NetIPAddress -AddressFamily IPv6 | Where-Object { 
+        $_.IPAddress -notmatch "^fe80:" -and $_.PrefixOrigin -ne "WellKnown" 
+    }
+    
+    if ($ipv6Adapters) {
+        $ipv6Primary = $ipv6Adapters | Select-Object -First 1
+        $connectivityReport.IPv6Address = $ipv6Primary.IPAddress
+        Write-Host "  ✓ IPv6 Address Found: $($ipv6Primary.IPAddress)" -ForegroundColor Green
+        
+        # Get IPv6 Gateway
+        $ipv6Route = Get-NetRoute -AddressFamily IPv6 -DestinationPrefix "::/0" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($ipv6Route) {
+            $connectivityReport.IPv6Gateway = $ipv6Route.NextHop
+            Write-Host "  ✓ IPv6 Gateway: $($ipv6Route.NextHop)" -ForegroundColor Green
+            
+            # Test gateway ping
+            Write-Host "  → Testing IPv6 gateway connectivity..." -ForegroundColor Gray
+            $gwPing = Invoke-QuickPing -IP $ipv6Route.NextHop -TimeoutMs 2000
+            if ($gwPing.Success) {
+                Write-Host "  ✓ IPv6 Gateway Ping: Success ($($gwPing.ResponseTime)ms)" -ForegroundColor Green
+                $connectivityReport.IPv6Ready = $true
+            } else {
+                Write-Host "  ✗ IPv6 Gateway Ping: Failed ($($gwPing.Status))" -ForegroundColor Red
+                $connectivityReport.Issues += "IPv6 gateway not responding"
+            }
+        } else {
+            Write-Host "  ✗ No IPv6 Gateway Found" -ForegroundColor Red
+            $connectivityReport.Issues += "No IPv6 default gateway configured"
+        }
+    } else {
+        Write-Host "  ✗ No IPv6 Address Assigned (Link-local only)" -ForegroundColor Red
+        $connectivityReport.Issues += "No global IPv6 address assigned to network adapter"
+    }
+    
+    # Test DNS Resolution
+    Write-Host "`n[3/6] Testing DNS Resolution..." -ForegroundColor Yellow
+    $dnsServers = Get-DnsClientServerAddress | Where-Object { $_.ServerAddresses.Count -gt 0 } | Select-Object -First 1
+    
+    if ($dnsServers) {
+        Write-Host "  ✓ DNS Servers Configured: $($dnsServers.ServerAddresses -join ', ')" -ForegroundColor Green
+        
+        # Test DNS resolution
+        try {
+            $dnsTest = Resolve-DnsName -Name "one.one.one.one" -Type A -ErrorAction Stop
+            Write-Host "  ✓ DNS Resolution: Working" -ForegroundColor Green
+        } catch {
+            Write-Host "  ✗ DNS Resolution: Failed" -ForegroundColor Red
+            $connectivityReport.Issues += "DNS resolution not working"
+        }
+    } else {
+        Write-Host "  ✗ No DNS Servers Configured" -ForegroundColor Red
+        $connectivityReport.Issues += "No DNS servers configured"
+    }
+    
+    # Test External Connectivity (Cloudflare DNS)
+    Write-Host "`n[4/6] Testing External Connectivity (1.1.1.1)..." -ForegroundColor Yellow
+    
+    $tracertRan = $false
+    $cfPingFailed = $false
+    if ($connectivityReport.IPv4Ready) {
+        Write-Host "  → Pinging 1.1.1.1 (Cloudflare DNS)..." -ForegroundColor Gray
+        $cfPing = Invoke-QuickPing -IP "1.1.1.1" -TimeoutMs 3000
+        
+        if ($cfPing.Success) {
+            Write-Host "  ✓ IPv4 Internet Connectivity: Success ($($cfPing.ResponseTime)ms)" -ForegroundColor Green
+            $connectivityReport.CanScanIPv4 = $true
+        } else {
+            Write-Host "  ✗ IPv4 Internet Connectivity: Failed ($($cfPing.Status))" -ForegroundColor Red
+            $connectivityReport.Issues += "Cannot reach external IPv4 hosts (1.1.1.1 unreachable)"
+            $connectivityReport.CanScanIPv4 = $false
+            $cfPingFailed = $true
+        }
+        
+        # Always offer traceroute (skippable)
+        if ($Interactive) {
+            Write-Host "`n  Would you like to run traceroute to 1.1.1.1? (Y/n) [Default: Y]" -ForegroundColor Cyan
+            Write-Host "  Command: tracert -d -w 1500 1.1.1.1" -ForegroundColor Gray
+            $response = Read-Host "  Your choice"
+            if ([string]::IsNullOrWhiteSpace($response)) { $response = 'Y' }
+            
+            if ($response -eq 'Y' -or $response -eq 'y') {
+                Write-Host "`n  Running traceroute... (Press Ctrl+C to cancel)`n" -ForegroundColor Cyan
+                & tracert -d -w 1500 1.1.1.1 | Out-Host
+                Write-Host ""
+                $tracertRan = $true
+            }
+        }
+    } else {
+        Write-Host "  ⊗ Skipped (No IPv4 connectivity)" -ForegroundColor Gray
+    }
+    
+    # Test IPv6 External Connectivity
+    if ($connectivityReport.IPv6Ready) {
+        Write-Host "  → Pinging 2606:4700:4700::1111 (Cloudflare DNS IPv6)..." -ForegroundColor Gray
+        $cfPing6 = Invoke-QuickPing -IP "2606:4700:4700::1111" -TimeoutMs 3000
+        
+        if ($cfPing6.Success) {
+            Write-Host "  ✓ IPv6 Internet Connectivity: Success ($($cfPing6.ResponseTime)ms)" -ForegroundColor Green
+            $connectivityReport.CanScanIPv6 = $true
+        } else {
+            Write-Host "  ✗ IPv6 Internet Connectivity: Failed ($($cfPing6.Status))" -ForegroundColor Red
+            $connectivityReport.Issues += "Cannot reach external IPv6 hosts"
+        }
+    } else {
+        Write-Host "  ⊗ IPv6 External Test Skipped (No IPv6 connectivity)" -ForegroundColor Gray
+    }
+    
+    # Test DCI DNS (217.218.155.155) - only if 1.1.1.1 failed
+    Write-Host "`n[5/6] Testing DCI DNS Connectivity (217.218.155.155)..." -ForegroundColor Yellow
+    
+    if ($connectivityReport.IPv4Ready) {
+        $dciPing = Invoke-QuickPing -IP "217.218.155.155" -TimeoutMs 3000
+        
+        if ($dciPing.Success) {
+            Write-Host "  ✓ DCI DNS: Reachable ($($dciPing.ResponseTime)ms)" -ForegroundColor Green
+        } else {
+            Write-Host "  ✗ DCI DNS: Unreachable ($($dciPing.Status))" -ForegroundColor Red
+        }
+        
+        # Only offer DCI traceroute if 1.1.1.1 ping failed
+        if ($Interactive -and $cfPingFailed) {
+            Write-Host "`n  Would you like to run traceroute to DCI DNS? (Y/n) [Default: Y]" -ForegroundColor Cyan
+            Write-Host "  Command: tracert -d -w 1500 217.218.155.155" -ForegroundColor Gray
+            $response = Read-Host "  Your choice"
+            if ([string]::IsNullOrWhiteSpace($response)) { $response = 'Y' }
+            
+            if ($response -eq 'Y' -or $response -eq 'y') {
+                Write-Host "`n  Running traceroute... (Press Ctrl+C to cancel)`n" -ForegroundColor Cyan
+                & tracert -d -w 1500 217.218.155.155 | Out-Host
+                Write-Host ""
+            }
+        }
+    } else {
+        Write-Host "  ⊗ Skipped (No IPv4 connectivity)" -ForegroundColor Gray
+    }
+    
+    # Summary
+    Write-Host "`n[6/6] Connectivity Summary..." -ForegroundColor Yellow
+    Write-Host "  ════════════════════════════════════════════════" -ForegroundColor Cyan
+    
+    if ($connectivityReport.CanScanIPv4) {
+        Write-Host "  ✓ IPv4 Scanning: READY" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ IPv4 Scanning: NOT AVAILABLE" -ForegroundColor Red
+    }
+    
+    if ($connectivityReport.CanScanIPv6) {
+        Write-Host "  ✓ IPv6 Scanning: READY" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ IPv6 Scanning: NOT AVAILABLE" -ForegroundColor Red
+    }
+    
+    if ($connectivityReport.Issues.Count -gt 0) {
+        Write-Host "`n  ⚠️  Issues Detected:" -ForegroundColor Yellow
+        foreach ($issue in $connectivityReport.Issues) {
+            Write-Host "     • $issue" -ForegroundColor Yellow
+        }
+    }
+    
+    Write-Host "  ════════════════════════════════════════════════" -ForegroundColor Cyan
+    
+    # Decision point
+    if (-not $connectivityReport.CanScanIPv4 -and -not $connectivityReport.CanScanIPv6) {
+        Write-Host "`n  ✗ CRITICAL: No network connectivity available for scanning!" -ForegroundColor Red
+        
+        if ($Interactive) {
+            Write-Host "`n  Options:" -ForegroundColor Yellow
+            Write-Host "    1. Fix network issues and restart script" -ForegroundColor Gray
+            Write-Host "    2. Continue anyway (scanning will fail)" -ForegroundColor Gray
+            Write-Host "    3. Exit script [Default]" -ForegroundColor Gray
+            $choice = Read-Host "`n  Your choice (1/2/3)"
+            if ([string]::IsNullOrWhiteSpace($choice)) { $choice = '3' }
+            
+            if ($choice -eq '3') {
+                Write-Host "`n  Exiting script..." -ForegroundColor Yellow
+                exit 0
+            } elseif ($choice -eq '1') {
+                Write-Host "`n  Please fix network connectivity and restart the script." -ForegroundColor Yellow
+                exit 0
+            } else {
+                Write-Host "`n  ⚠️  Continuing with limited connectivity..." -ForegroundColor Yellow
+            }
+        }
+    } elseif (-not $connectivityReport.CanScanIPv4 -or -not $connectivityReport.CanScanIPv6) {
+        Write-Host "`n  ⚠️  WARNING: Partial connectivity detected!" -ForegroundColor Yellow
+        
+        if (-not $connectivityReport.CanScanIPv4) {
+            Write-Host "    → IPv4 scanning will be skipped or may fail" -ForegroundColor Yellow
+        }
+        if (-not $connectivityReport.CanScanIPv6) {
+            Write-Host "    → IPv6 scanning will be skipped or may fail" -ForegroundColor Yellow
+        }
+        
+        if ($Interactive) {
+            Write-Host "`n  Continue with limited connectivity? (Y/n) [Default: Y]" -ForegroundColor Yellow
+            $response = Read-Host "  Your choice"
+            if ([string]::IsNullOrWhiteSpace($response)) { $response = 'Y' }
+            
+            if ($response -ne 'Y' -and $response -ne 'y') {
+                Write-Host "`n  Exiting script..." -ForegroundColor Yellow
+                exit 0
+            }
+        }
+    } else {
+        Write-Host "`n  ✓ Network connectivity check passed! Ready to scan." -ForegroundColor Green
+    }
+    
+    Write-Host ""
+    return $connectivityReport
+}
+
+# Helper function to perform quick ping test (works for both IPv4 and IPv6)
+function Invoke-QuickPing {
+    param(
+        [string]$IP,
+        [int]$TimeoutMs
+    )
+    
+    try {
+        $pingObj = New-Object System.Net.NetworkInformation.Ping
+        $pingReply = $pingObj.Send($IP, $TimeoutMs)
+        
+        # Use proper enum comparison instead of string
+        if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            return [PSCustomObject]@{
+                Success = $true
+                ResponseTime = $pingReply.RoundtripTime
+                Status = "Success"
+            }
+        } else {
+            # Return actual status for troubleshooting
+            return [PSCustomObject]@{
+                Success = $false
+                ResponseTime = 0
+                Status = $pingReply.Status.ToString()
+            }
+        }
+    } catch {
+        # Return error message for debugging
+        return [PSCustomObject]@{
+            Success = $false
+            ResponseTime = 0
+            Status = "Error: $($_.Exception.Message)"
+        }
+    }
+}
+
+# Helper function to display scan result
+function Write-ScanResult {
+    param(
+        [string]$IP,
+        [bool]$IsSuccessful,
+        [string]$ScanMode,
+        [object]$ScanResult
+    )
+    
+    if ($IsSuccessful) {
+        if ($ScanMode -eq "ping") {
+            Write-Host "  ✓ $IP - $($ScanResult.PingTime) ms" -ForegroundColor Green
+        } elseif ($ScanMode -eq "port") {
+            Write-Host "  ✓ $IP - Ports: $($ScanResult.PortsOpen)" -ForegroundColor Green
+        } elseif ($ScanMode -eq "both") {
+            Write-Host "  ✓ $IP - $($ScanResult.PingTime) ms, Ports: $($ScanResult.PortsOpen)" -ForegroundColor Green
+        }
+    } else {
+        if ($ScanMode -eq "ping") {
+            Write-Host "  ✗ $IP - No ping response" -ForegroundColor Red
+        } elseif ($ScanMode -eq "port") {
+            Write-Host "  ✗ $IP - No open ports" -ForegroundColor Red
+        } elseif ($ScanMode -eq "both") {
+            Write-Host "  ✗ $IP - No response" -ForegroundColor Red
+        }
+    }
+}
+
+# Helper function to save scan result to CSV
+function Save-ScanResult {
+    param(
+        [string]$IP,
+        [string]$ScanMode,
+        [object]$ScanResult,
+        [string]$OutputPath
+    )
+    
+    $outputResult = $null
+    
+    if ($ScanMode -eq "ping") {
+        $outputResult = [PSCustomObject]@{
+            IP = $IP
+            Location = $ScanResult.Location
+            'Ping Time (ms)' = $ScanResult.PingTime
+        }
+    } elseif ($ScanMode -eq "port") {
+        $outputResult = [PSCustomObject]@{
+            IP = $IP
+            Location = $ScanResult.Location
+            'Ports Open' = $ScanResult.PortsOpen
+            'Service Status' = $ScanResult.ServiceStatus
+        }
+    } elseif ($ScanMode -eq "both") {
+        $outputResult = [PSCustomObject]@{
+            IP = $IP
+            Location = $ScanResult.Location
+            'Ping Result' = $ScanResult.PingResult
+            'Ping Time (ms)' = $ScanResult.PingTime
+            'Ports Open' = $ScanResult.PortsOpen
+            'Service Status' = $ScanResult.ServiceStatus
+            'Network Status' = $ScanResult.NetworkStatus
+        }
+    }
+    
+    if ($outputResult) {
+        $outputResult | Export-Csv -Path $OutputPath -Append -NoTypeInformation
+    }
+}
+
+# Helper function to check if scan was successful
+function Test-ScanSuccess {
+    param(
+        [string]$ScanMode,
+        [object]$ScanResult
+    )
+    
+    if ($ScanMode -eq "ping") {
+        return ($ScanResult.PingResult -eq "Success")
+    } elseif ($ScanMode -eq "port") {
+        return ($ScanResult.PortsOpen -ne "None")
+    } elseif ($ScanMode -eq "both") {
+        return ($ScanResult.PingResult -eq "Success" -or $ScanResult.PortsOpen -ne "None")
+    }
+    
+    return $false
+}
+
+# Unified scanning function for both IPv4 and IPv6 with jump logic
+function Invoke-UnifiedScan {
+    param(
+        [object]$Range,
+        [string]$ScanMode,
+        [int]$Timeout,
+        [string]$Ports,
+        [int]$PortTimeout,
+        [int]$MaxFailures,
+        [int]$Jump,
+        [int]$Skip,
+        [int]$MaxResponses,
+        [string]$LocationData,
+        [string]$OutputPath,
+        [string]$IPRange
+    )
+    
+    $successful = @()
+    $jumpCount = 0
+    $maxResponsesReached = $false
+    
+    if ($Range.IPVersion -eq 4) {
+        # IPv4 scanning
+        $currentPosition = $Range.StartIP
+        
+        while ($currentPosition -le $Range.EndIP -and -not $maxResponsesReached) {
+            if (Test-SkipKeyPressed) {
+                Write-Host "  ⏭️  Skip key pressed - skipping remaining IPs in range $IPRange" -ForegroundColor Yellow
+                break
+            }
+            
+            $checkLimit = [Math]::Min($currentPosition + $MaxFailures - 1, $Range.EndIP)
+            $timeoutCount = 0
+            
+            for ($ipNum = $currentPosition; $ipNum -le $checkLimit; $ipNum++) {
+                $currentIP = ConvertTo-IPString -IPInt $ipNum
+                if ($null -eq $currentIP) { continue }
+                
+                Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
+                
+                $scanResult = Invoke-NetworkScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData $LocationData
+                $isSuccessful = Test-ScanSuccess -ScanMode $ScanMode -ScanResult $scanResult
+                
+                if (-not $isSuccessful) {
+                    $timeoutCount++
+                    Write-ScanResult -IP $currentIP -IsSuccessful $false -ScanMode $ScanMode -ScanResult $scanResult
+                } else {
+                    Write-ScanResult -IP $currentIP -IsSuccessful $true -ScanMode $ScanMode -ScanResult $scanResult
+                    $successful += $currentIP
+                    Save-ScanResult -IP $currentIP -ScanMode $ScanMode -ScanResult $scanResult -OutputPath $OutputPath
+                    
+                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                        Write-Host "  Reached maximum responses ($MaxResponses) for range $IPRange - skipping remaining IPs" -ForegroundColor Yellow
+                        $maxResponsesReached = $true
+                        break
+                    }
+                }
+            }
+            
+            if ($timeoutCount -ge $MaxFailures) {
+                if ($Jump -gt 0) {
+                    $jumpCount++
+                    if ($jumpCount -ge $Skip) {
+                        Write-Host "  Reached jump limit ($Skip jumps) - skipping remaining IPs in range $IPRange" -ForegroundColor Red
+                        break
+                    }
+                    Write-Host "  Jumping $Jump IPs due to $timeoutCount/$MaxFailures consecutive timeouts (jump #$jumpCount)" -ForegroundColor Yellow
+                    $currentPosition = $checkLimit + 1 + $Jump
+                } else {
+                    Write-Host "  Skipping remaining IPs in range $IPRange due to $timeoutCount/$MaxFailures consecutive timeouts" -ForegroundColor Red
+                    break
+                }
+            } else {
+                $currentPosition = $checkLimit + 1
+            }
+        }
+    } else {
+        # IPv6 scanning
+        $currentPosition = $Range.StartIP
+        $maxIPv6Scan = 65536
+        $count = 0
+        $consecutiveFailures = 0
+        
+        while ((Compare-IPv6Address -Address1 $currentPosition -Address2 $Range.EndIP) -le 0 -and $count -lt $maxIPv6Scan -and -not $maxResponsesReached) {
+            if (Test-SkipKeyPressed) {
+                Write-Host "  ⏭️  Skip key pressed - skipping remaining IPs in IPv6 range $IPRange" -ForegroundColor Yellow
+                break
+            }
+            
+            $currentIPStr = ConvertTo-IPString -IPBytes $currentPosition
+            if ($null -eq $currentIPStr) {
+                $currentPosition = Add-IPv6Address -IPBytes $currentPosition -Increment 1
+                $count++
+                continue
+            }
+            
+            Write-Host "  Scanning: $currentIPStr" -ForegroundColor Cyan
+            
+            $scanResult = Invoke-NetworkScan -IP $currentIPStr -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData $LocationData
+            $isSuccessful = Test-ScanSuccess -ScanMode $ScanMode -ScanResult $scanResult
+            
+            if ($isSuccessful) {
+                $consecutiveFailures = 0
+                Write-ScanResult -IP $currentIPStr -IsSuccessful $true -ScanMode $ScanMode -ScanResult $scanResult
+                $successful += $currentIPStr
+                Save-ScanResult -IP $currentIPStr -ScanMode $ScanMode -ScanResult $scanResult -OutputPath $OutputPath
+                
+                if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                    Write-Host "  Reached maximum responses ($MaxResponses) for range $IPRange - skipping remaining IPs" -ForegroundColor Yellow
+                    $maxResponsesReached = $true
+                    break
+                }
+            } else {
+                $consecutiveFailures++
+                Write-ScanResult -IP $currentIPStr -IsSuccessful $false -ScanMode $ScanMode -ScanResult $scanResult
+                
+                if ($consecutiveFailures -ge $MaxFailures) {
+                    if ($Jump -gt 0) {
+                        $jumpCount++
+                        if ($jumpCount -ge $Skip) {
+                            Write-Host "  Reached jump limit ($Skip jumps) - skipping remaining IPs in range $IPRange" -ForegroundColor Red
+                            break
+                        }
+                        Write-Host "  Jumping $Jump IPs due to $consecutiveFailures/$MaxFailures consecutive failures (jump #$jumpCount)" -ForegroundColor Yellow
+                        $currentPosition = Add-IPv6Address -IPBytes $currentPosition -Increment $Jump
+                        $count += $Jump
+                        $consecutiveFailures = 0
+                        continue
+                    } else {
+                        Write-Host "  Skipping remaining IPs in range $IPRange due to $consecutiveFailures/$MaxFailures consecutive failures" -ForegroundColor Red
+                        break
+                    }
+                }
+            }
+            
+            $currentPosition = Add-IPv6Address -IPBytes $currentPosition -Increment 1
+            $count++
+        }
+    }
+    
+    return $successful
+}
+
 # Perform network scan based on mode
 function Invoke-NetworkScan {
     param(
@@ -1092,13 +1882,17 @@ function Invoke-NetworkScan {
     
     # Perform ping test if required and not skipped
     if (($ScanMode -eq "ping" -or $ScanMode -eq "both") -and -not $SkipPing) {
-        if ($isPSCore) {
+        $isIPv6 = $IP -match ':'
+        
+        if ($isPSCore -and -not $isIPv6) {
+            # PowerShell Core with IPv4
             $ping = Test-Connection -ComputerName $IP -Count 1 -TimeoutSeconds ($PingTimeoutMs / 1000) -ErrorAction SilentlyContinue
         } else {
+            # PowerShell 5.1 or IPv6 - use .NET Ping
             try {
                 $pingObj = New-Object System.Net.NetworkInformation.Ping
                 $pingReply = $pingObj.Send($IP, $PingTimeoutMs)
-                if ($pingReply.Status -eq "Success") {
+                if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
                     $ping = [PSCustomObject]@{
                         ResponseTime = $pingReply.RoundtripTime
                         Status = "Success"
@@ -1220,14 +2014,18 @@ if (-not (Test-Path -Path $inputPath)) {
     exit 1
 }
 
+# Run network connectivity pre-flight check
+$networkStatus = Test-NetworkConnectivity -Interactive $true
+
 Write-Host "`n🚀 Starting operations..." -ForegroundColor Green
 Write-Host "═══════════════════════════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host "Input file: $InputFile" -ForegroundColor Yellow
 Write-Host "Output file: $OutputFile" -ForegroundColor Yellow
-Write-Host "Scan mode: $ScanMode" -ForegroundColor Yellow    if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
+Write-Host "Scan mode: $ScanMode" -ForegroundColor Yellow   
+if ($ScanMode -eq "ping" -or $ScanMode -eq "both") {
         Write-Host "Ping timeout: ${Timeout}ms" -ForegroundColor Yellow
-    }
-    if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
+}
+if ($ScanMode -eq "port" -or $ScanMode -eq "both") {
     Write-Host "Port timeout: ${PortTimeout}ms" -ForegroundColor Yellow
     Write-Host "Ports to scan: $Ports" -ForegroundColor Yellow
 }
@@ -1237,7 +2035,9 @@ if ($Jump -gt 0) {
 } else {
     Write-Host "Jump mode: Disabled" -ForegroundColor Yellow
 }
+Write-Host "Network Status: IPv4=$($networkStatus.CanScanIPv4) | IPv6=$($networkStatus.CanScanIPv6)" -ForegroundColor Yellow
 Write-Host "═══════════════════════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "💡 Tip: Press 'S' at any time during scanning to skip the current range" -ForegroundColor Cyan
 Write-Host ""
 
 # Initialize output CSV with appropriate headers based on scan mode
@@ -1263,32 +2063,37 @@ foreach ($entry in $ipRanges) {
         continue
     }
     
-    # Check for IPv6 (basic check)
-    if ($ipRange -match ":" -or $ipRange -match "^2[0-9a-f]{3}:") {
-        Write-Host "Skipping IPv6 range: $ipRange"
-        continue
-    }
+    Write-Host "Processing IP Range: $ipRange" -ForegroundColor Cyan
+    Write-Host "  💡 Press 'S' key anytime to skip this range" -ForegroundColor Gray
     
-    Write-Host "Processing IP Range: $ipRange"
-    
-    # Parse CIDR notation
+    # Parse CIDR notation and detect IP version
     if ($ipRange -match "/") {
         $baseIP = $ipRange.Split("/")[0]
         $subnet = [int]$ipRange.Split("/")[1]
         $cidrRange = $ipRange
     } else {
-        # No subnet mask found, assume it's a single IP (subnet /32)
+        # No subnet mask found, assume single IP
         $baseIP = $ipRange
-        $subnet = 32
-        $cidrRange = "$ipRange/32"
-        Write-Host "Note: Single IP detected - using /32 subnet"
+        $ipVersion = Get-IPVersion -IPAddress $baseIP
+        if ($ipVersion -eq 4) {
+            $subnet = 32
+            $cidrRange = "$ipRange/32"
+            Write-Host "Note: Single IPv4 address detected - using /32 subnet"
+        } elseif ($ipVersion -eq 6) {
+            $subnet = 128
+            $cidrRange = "$ipRange/128"
+            Write-Host "Note: Single IPv6 address detected - using /128 subnet"
+        } else {
+            Write-Host "[ERROR] Invalid IP address format: $baseIP"
+            continue
+        }
     }
     
     # Validate IP address format
     try {
         $null = [System.Net.IPAddress]::Parse($baseIP)
     } catch {
-        Write-Host "[ERROR] Invalid IPv4 format: $baseIP - Must be in format xxx.xxx.xxx.xxx"
+        Write-Host "[ERROR] Invalid IP address format: $baseIP"
         continue
     }
     
@@ -1297,13 +2102,60 @@ foreach ($entry in $ipRanges) {
     if ($null -eq $range) {
         Write-Host "[ERROR] Failed to calculate range for: $ipRange"
         continue
-    }    # Initialize counters for this range
+    }
+    
+    # Check if we can scan this IP protocol
+    if ($range.IPVersion -eq 4 -and -not $networkStatus.CanScanIPv4) {
+        Write-Host "[SKIPPED] IPv4 range detected but IPv4 connectivity is not available" -ForegroundColor Yellow
+        Write-Host "          Range: $ipRange" -ForegroundColor Yellow
+        Write-Host "          Reason: $($networkStatus.Issues | Where-Object { $_ -like '*IPv4*' } | Select-Object -First 1)" -ForegroundColor Yellow
+        Write-Host ""
+        continue
+    }
+    
+    if ($range.IPVersion -eq 6 -and -not $networkStatus.CanScanIPv6) {
+        Write-Host "[SKIPPED] IPv6 range detected but IPv6 connectivity is not available" -ForegroundColor Yellow
+        Write-Host "          Range: $ipRange" -ForegroundColor Yellow
+        Write-Host "          Reason: $($networkStatus.Issues | Where-Object { $_ -like '*IPv6*' } | Select-Object -First 1)" -ForegroundColor Yellow
+        Write-Host ""
+        continue
+    }
+    
+    # Initialize counters for this range
     $successful = @()
-    $totalIPs = ($range.EndIP - $range.StartIP + 1)
     $jumpCount = 0
-    $currentPosition = $range.StartIP
     $maxResponsesReached = $false
-      Write-Host "  Range contains $totalIPs IPs (from $(ConvertTo-IPString -IPInt $range.StartIP) to $(ConvertTo-IPString -IPInt $range.EndIP))" -ForegroundColor Yellow
+    
+    # Handle IPv6 range limiting
+    if ($range.IPVersion -eq 6) {
+        $totalIPs = $range.TotalIPs
+        
+        # IPv6 ranges can be HUGE - implement intelligent limiting
+        $maxIPv6Scan = 65536  # Maximum IPs to scan in IPv6 range (configurable)
+        
+        if ($range.HostBits -gt 16) {
+            Write-Host "[WARNING] IPv6 range /$subnet is very large (2^$($range.HostBits) addresses)" -ForegroundColor Yellow
+            Write-Host "          Limiting scan to first $maxIPv6Scan addresses for safety" -ForegroundColor Yellow
+            $scanLimited = $true
+        } else {
+            $scanLimited = $false
+        }
+        
+        $currentPosition = $range.StartIP
+        $startIPStr = ConvertTo-IPString -IPBytes $range.StartIP
+        $endIPStr = ConvertTo-IPString -IPBytes $range.EndIP
+        
+        if ($scanLimited) {
+            Write-Host "  IPv6 Range: $startIPStr to $endIPStr (scanning first $maxIPv6Scan)" -ForegroundColor Yellow
+        } else {
+            Write-Host "  IPv6 Range: $startIPStr to $endIPStr ($totalIPs addresses)" -ForegroundColor Yellow
+        }
+    } else {
+        # IPv4
+        $totalIPs = $range.TotalIPs
+        $currentPosition = $range.StartIP
+        Write-Host "  Range contains $totalIPs IPs (from $(ConvertTo-IPString -IPInt $range.StartIP) to $(ConvertTo-IPString -IPInt $range.EndIP))" -ForegroundColor Yellow
+    }
     if ($Jump -gt 0) {
         Write-Host "  Jump mode enabled: will skip $Jump IPs after $MaxFailures failures (skip range after $Skip jumps)" -ForegroundColor Yellow
     }
@@ -1313,7 +2165,45 @@ foreach ($entry in $ipRanges) {
       # Handle parallel ping mode separately
     if ($ScanMode -eq "parallel") {
         Write-Host "  Using parallel ping mode with batch processing" -ForegroundColor Yellow
-        $successful = Invoke-BatchParallelPing -StartIP $range.StartIP -EndIP $range.EndIP -TimeoutMs $Timeout -BatchSize 256 -JumpSize 1024 -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)" -OutputPath $outputPath
+        
+        if ($range.IPVersion -eq 4) {
+            $successful = Invoke-BatchParallelPing -StartIP $range.StartIP -EndIP $range.EndIP -TimeoutMs $Timeout -BatchSize 256 -JumpSize 1024 -DelayMs $DelayMs -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)" -OutputPath $outputPath
+        } else {
+            # IPv6 parallel mode - create IP list from range
+            Write-Host "  Building IPv6 address list for parallel scanning..." -ForegroundColor Yellow
+            $ipList = @()
+            $currentIP = $range.StartIP
+            $maxIPv6Scan = 65536
+            $count = 0
+            
+            while ((Compare-IPv6Address -Address1 $currentIP -Address2 $range.EndIP) -le 0 -and $count -lt $maxIPv6Scan) {
+                # Check for skip key press
+                if (Test-SkipKeyPressed) {
+                    Write-Host "  ⏭️  Skip key pressed - stopping IPv6 address list build" -ForegroundColor Yellow
+                    break
+                }
+                
+                $ipStr = ConvertTo-IPString -IPBytes $currentIP
+                $ipList += $ipStr
+                $currentIP = Add-IPv6Address -IPBytes $currentIP -Increment 1
+                $count++
+            }
+            
+            Write-Host "  Testing $($ipList.Count) IPv6 addresses in parallel..." -ForegroundColor Yellow
+            $results = Invoke-ParallelPing -IPList $ipList -TimeoutMs $Timeout -MaxConcurrent 50
+            
+            $successfulResults = $results | Where-Object { $_.Success }
+            foreach ($result in $successfulResults) {
+                $successful += $result.IP
+                $outputResult = [PSCustomObject]@{
+                    IP = $result.IP
+                    Location = "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+                    'Ping Time (ms)' = $result.ResponseTime
+                }
+                $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                Write-Host "  ✓ $($result.IP) - $($result.ResponseTime) ms" -ForegroundColor Green
+            }
+        }
     } else {
         # Traditional scanning modes: ping, port, both
         # For "both" mode: First do a quick ping sweep, then port scan non-responders
@@ -1323,25 +2213,29 @@ foreach ($entry in $ipRanges) {
         if ($ScanMode -eq "both") {
             Write-Host "  Phase 1: Quick ping sweep to identify responsive hosts" -ForegroundColor Yellow
             
-            # Quick ping sweep for "both" mode
-            for ($ipNum = $range.StartIP; $ipNum -le $range.EndIP; $ipNum++) {
-                if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
-                    Write-Host "  Reached maximum responses ($MaxResponses) - stopping ping sweep" -ForegroundColor Yellow
-                    break
-                }
-                
-                $currentIP = ConvertTo-IPString -IPInt $ipNum
-                if ($null -eq $currentIP) { continue }
-                
-                # Quick ping test
-                $pingResult = $null
-                if ($isPSCore) {
-                    $pingResult = Test-Connection -ComputerName $currentIP -Count 1 -TimeoutSeconds ($Timeout / 1000) -ErrorAction SilentlyContinue
-                } else {
+            if ($range.IPVersion -eq 4) {
+                # IPv4 quick ping sweep
+                for ($ipNum = $range.StartIP; $ipNum -le $range.EndIP; $ipNum++) {
+                    # Check for skip key press
+                    if (Test-SkipKeyPressed) {
+                        Write-Host "  ⏭️  Skip key pressed - stopping ping sweep for current range" -ForegroundColor Yellow
+                        break
+                    }
+                    
+                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                        Write-Host "  Reached maximum responses ($MaxResponses) - stopping ping sweep" -ForegroundColor Yellow
+                        break
+                    }
+                    
+                    $currentIP = ConvertTo-IPString -IPInt $ipNum
+                    if ($null -eq $currentIP) { continue }
+                    
+                    # Quick ping test (IPv4)
+                    $pingResult = $null
                     try {
                         $pingObj = New-Object System.Net.NetworkInformation.Ping
                         $pingReply = $pingObj.Send($currentIP, $Timeout)
-                        if ($pingReply.Status -eq "Success") {
+                        if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
                             $pingResult = [PSCustomObject]@{
                                 ResponseTime = $pingReply.RoundtripTime
                                 Status = "Success"
@@ -1350,26 +2244,89 @@ foreach ($entry in $ipRanges) {
                     } catch {
                         $pingResult = $null
                     }
-                }
-                
-                if ($pingResult) {
-                    $pingResponders += $currentIP
-                    $successful += $currentIP
                     
-                    # Save ping responder to output
-                    $outputResult = [PSCustomObject]@{
-                        IP = $currentIP
-                        Location = "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
-                        'Ping Result' = "Success"
-                        'Ping Time (ms)' = $pingResult.ResponseTime
-                        'Ports Open' = "N/A"
-                        'Service Status' = "Ping-Responsive"
-                        'Network Status' = "Normal"
+                    if ($pingResult) {
+                        $pingResponders += $currentIP
+                        $successful += $currentIP
+                        
+                        # Save ping responder to output
+                        $outputResult = [PSCustomObject]@{
+                            IP = $currentIP
+                            Location = "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+                            'Ping Result' = "Success"
+                            'Ping Time (ms)' = $pingResult.ResponseTime
+                            'Ports Open' = "N/A"
+                            'Service Status' = "Ping-Responsive"
+                            'Network Status' = "Normal"
+                        }
+                        $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                        Write-Host "  ✓ $currentIP - $($pingResult.ResponseTime) ms (ping responsive)" -ForegroundColor Green
+                    } else {
+                        $nonResponders += $currentIP
                     }
-                    $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
-                    Write-Host "  ✓ $currentIP - $($pingResult.ResponseTime) ms (ping responsive)" -ForegroundColor Green
-                } else {
-                    $nonResponders += $currentIP
+                }
+            } else {
+                # IPv6 quick ping sweep
+                $currentIP = $range.StartIP
+                $maxIPv6Scan = 65536
+                $count = 0
+                
+                while ((Compare-IPv6Address -Address1 $currentIP -Address2 $range.EndIP) -le 0 -and $count -lt $maxIPv6Scan) {
+                    # Check for skip key press
+                    if (Test-SkipKeyPressed) {
+                        Write-Host "  ⏭️  Skip key pressed - stopping IPv6 ping sweep for current range" -ForegroundColor Yellow
+                        break
+                    }
+                    
+                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
+                        Write-Host "  Reached maximum responses ($MaxResponses) - stopping ping sweep" -ForegroundColor Yellow
+                        break
+                    }
+                    
+                    $currentIPStr = ConvertTo-IPString -IPBytes $currentIP
+                    if ($null -eq $currentIPStr) { 
+                        $currentIP = Add-IPv6Address -IPBytes $currentIP -Increment 1
+                        $count++
+                        continue 
+                    }
+                    
+                    # Quick ping test for IPv6
+                    $pingResult = $null
+                    try {
+                        $pingObj = New-Object System.Net.NetworkInformation.Ping
+                        $pingReply = $pingObj.Send($currentIPStr, $Timeout)
+                        if ($pingReply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+                            $pingResult = [PSCustomObject]@{
+                                ResponseTime = $pingReply.RoundtripTime
+                                Status = "Success"
+                            }
+                        }
+                    } catch {
+                        $pingResult = $null
+                    }
+                    
+                    if ($pingResult) {
+                        $pingResponders += $currentIPStr
+                        $successful += $currentIPStr
+                        
+                        # Save ping responder to output
+                        $outputResult = [PSCustomObject]@{
+                            IP = $currentIPStr
+                            Location = "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
+                            'Ping Result' = "Success"
+                            'Ping Time (ms)' = $pingResult.ResponseTime
+                            'Ports Open' = "N/A"
+                            'Service Status' = "Ping-Responsive"
+                            'Network Status' = "Normal"
+                        }
+                        $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
+                        Write-Host "  ✓ $currentIPStr - $($pingResult.ResponseTime) ms (ping responsive)" -ForegroundColor Green
+                    } else {
+                        $nonResponders += $currentIPStr
+                    }
+                    
+                    $currentIP = Add-IPv6Address -IPBytes $currentIP -Increment 1
+                    $count++
                 }
             }
             
@@ -1380,6 +2337,12 @@ foreach ($entry in $ipRanges) {
                 
                 # Port scan non-responders
                 foreach ($ip in $nonResponders) {
+                    # Check for skip key press
+                    if (Test-SkipKeyPressed) {
+                        Write-Host "  ⏭️  Skip key pressed - stopping port scan for current range" -ForegroundColor Yellow
+                        break
+                    }
+                    
                     if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
                         Write-Host "  Reached maximum responses ($MaxResponses) - stopping port scan" -ForegroundColor Yellow
                         break
@@ -1405,105 +2368,32 @@ foreach ($entry in $ipRanges) {
                     }
                 }
             }
-        } else {            # Traditional scanning loop for ping and port modes
-        # Main scanning loop with jump functionality
-        while ($currentPosition -le $range.EndIP -and -not $maxResponsesReached) {
-            # Check if we've exceeded the skip limit
-            if ($jumpCount -ge $Skip -and $Jump -gt 0) {
-                Write-Host "  Skipping remaining IPs in range $ipRange due to $jumpCount/$Skip jumps reached." -ForegroundColor Red
-                break
-            }
-            
-            # Pre-calculate limit for the current set of IPs to check
-            $checkLimit = [Math]::Min($currentPosition + $MaxFailures - 1, $range.EndIP)
-            
-            # Check the current set of IPs for timeouts
-            $timeoutCount = 0
-            
-            for ($ipNum = $currentPosition; $ipNum -le $checkLimit; $ipNum++) {
-                $currentIP = ConvertTo-IPString -IPInt $ipNum
-                
-                # Skip invalid IPs
-                if ($null -eq $currentIP) { continue }
-                
-                # Use scan function for ping and port modes
-                Write-Host "  Scanning: $currentIP" -ForegroundColor Cyan
-                
-                $scanResult = Invoke-NetworkScan -IP $currentIP -ScanMode $ScanMode -PingTimeoutMs $Timeout -PortList $Ports -PortTimeoutMs $PortTimeout -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)"
-                
-                # Determine if this IP is considered "successful" based on scan mode
-                $isSuccessful = $false
-                if ($ScanMode -eq "ping") {
-                    $isSuccessful = ($scanResult.PingResult -eq "Success")
-                } elseif ($ScanMode -eq "port") {
-                    $isSuccessful = ($scanResult.PortsOpen -ne "None")
-                }
-                
-                if (-not $isSuccessful) {
-                    $timeoutCount++
-                    if ($ScanMode -eq "ping") {
-                        Write-Host "  ✗ $currentIP - No ping response" -ForegroundColor Red
-                    } elseif ($ScanMode -eq "port") {
-                        Write-Host "  ✗ $currentIP - No open ports" -ForegroundColor Red
-                    }
-                } else {
-                    # Display results based on scan mode
-                    if ($ScanMode -eq "ping") {
-                        Write-Host "  ✓ $currentIP - $($scanResult.PingTime) ms" -ForegroundColor Green
-                    } elseif ($ScanMode -eq "port") {
-                        Write-Host "  ✓ $currentIP - Ports: $($scanResult.PortsOpen)" -ForegroundColor Green
-                    }
-                    
-                    # Add to successful list
-                    $successful += $currentIP
-                    
-                    # Save to the output file based on scan mode
-                    if ($ScanMode -eq "ping") {
-                        $outputResult = [PSCustomObject]@{
-                            IP = $currentIP
-                            Location = $scanResult.Location
-                            'Ping Time (ms)' = $scanResult.PingTime
-                        }
-                    } elseif ($ScanMode -eq "port") {
-                        $outputResult = [PSCustomObject]@{
-                            IP = $currentIP
-                            Location = $scanResult.Location
-                            'Ports Open' = $scanResult.PortsOpen
-                            'Service Status' = $scanResult.ServiceStatus
-                        }
-                    }
-                    
-                    $outputResult | Export-Csv -Path $outputPath -Append -NoTypeInformation
-                    
-                    # Check if we've reached the maximum number of responses for this range
-                    if ($MaxResponses -gt 0 -and $successful.Count -ge $MaxResponses) {
-                        Write-Host "  Reached maximum responses ($MaxResponses) for range $ipRange - skipping remaining IPs" -ForegroundColor Yellow
-                        $maxResponsesReached = $true
-                        break  # Exit the inner IP scanning loop for this batch
-                    }
-                }
-            }
-            
-            # Handle failures and jumping logic
-            if ($timeoutCount -ge $MaxFailures) {
-                if ($Jump -gt 0) {
-                    $jumpCount++
-                    Write-Host "  Jumping $Jump IPs due to $timeoutCount/$MaxFailures consecutive timeouts (jump #$jumpCount)" -ForegroundColor Yellow
-                    $currentPosition = $checkLimit + 1 + $Jump
-                } else {
-                    Write-Host "  Skipping remaining IPs in range $ipRange due to $timeoutCount/$MaxFailures consecutive timeouts." -ForegroundColor Red
-                    break
-                }
-            } else {
-                # Continue with next batch
-                $currentPosition = $checkLimit + 1
-            }
-        }        }
+        } else {
+            # Traditional scanning loop for ping and port modes
+            # Use unified scanning function for both IPv4 and IPv6
+            $successful = Invoke-UnifiedScan `
+                -Range $range `
+                -ScanMode $ScanMode `
+                -Timeout $Timeout `
+                -Ports $Ports `
+                -PortTimeout $PortTimeout `
+                -MaxFailures $MaxFailures `
+                -Jump $Jump `
+                -Skip $Skip `
+                -MaxResponses $MaxResponses `
+                -LocationData "$($entry.Location),$($entry.Region),$($entry.City),$($entry.PostalCode)" `
+                -OutputPath $outputPath `
+                -IPRange $ipRange
+        }
     }
     
     # Display summary of reachable IPs
     if ($successful.Count -gt 0) {
-        Write-Host "✓ Range ${cidrRange}: $($successful.Count)/$totalIPs IPs reachable" -ForegroundColor Green
+        if ($range.IPVersion -eq 6 -and $range.HostBits -gt 16) {
+            Write-Host "✓ Range ${cidrRange}: $($successful.Count) IPs reachable (limited scan)" -ForegroundColor Green
+        } else {
+            Write-Host "✓ Range ${cidrRange}: $($successful.Count)/$totalIPs IPs reachable" -ForegroundColor Green
+        }
         if ($jumpCount -gt 0) {
             Write-Host "  └─ Used $jumpCount jump(s) during scan" -ForegroundColor Cyan
         }
